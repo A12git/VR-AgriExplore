@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Get source code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -46,6 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Publish website
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
