@@ -26,17 +26,22 @@ geometry.scale(-1, 1, 1);
 
 const loader = new THREE.TextureLoader();
 
+
+const panoramaPath =
+  `${import.meta.env.BASE_URL}placeholder.jpg`;
+
 loader.load(
-  '/placeholder.jpg',
+  panoramaPath,
   (texture) => {
     const material = new THREE.MeshBasicMaterial({
       map: texture
     });
+
     scene.add(new THREE.Mesh(geometry, material));
   },
   undefined,
   (error) => {
-    console.error('Panorama failed to load:', error);
+    console.error('Panorama failed to load:', panoramaPath, error);
   }
 );
 
@@ -44,23 +49,19 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = false;
 controls.rotateSpeed = -0.3;
-
-controls.enableZoom = false;
 controls.enableZoom = false;
 
 const minFov = 30;
 const maxFov = 100;
-const zoomSpeed = 5;
+const zoomSpeed = 0.5;
 
 window.addEventListener('wheel', (event) => {
   camera.fov += event.deltaY * 0.01 * zoomSpeed;
-
   camera.fov = THREE.MathUtils.clamp(
     camera.fov,
     minFov,
     maxFov
   );
-
   camera.updateProjectionMatrix();
 });
 
@@ -70,7 +71,6 @@ const startTarget = controls.target.clone();
 const resetButton = document.createElement('button');
 resetButton.textContent = 'Reset Camera';
 resetButton.className = 'reset-button';
-
 document.body.appendChild(resetButton);
 
 resetButton.addEventListener('click', () => {
@@ -92,7 +92,5 @@ function animate() {
   controls.update();
   renderer.render(scene, camera);
 }
-
-
 
 animate();
