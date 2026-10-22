@@ -27,23 +27,66 @@ geometry.scale(-1, 1, 1);
 const loader = new THREE.TextureLoader();
 
 
-const panoramaPath =
-  `${import.meta.env.BASE_URL}placeholder.jpg`;
+const scenes = {
+  bedroom: `${import.meta.env.BASE_URL}placeholder.jpg`,
+  livingroom: `${import.meta.env.BASE_URL}livingroom.jpg`,
+  bathroom: `${import.meta.env.BASE_URL}bathroom.jpg`
+};
 
-loader.load(
-  panoramaPath,
-  (texture) => {
-    const material = new THREE.MeshBasicMaterial({
-      map: texture
-    });
+let currentScene = 'bedroom';
 
-    scene.add(new THREE.Mesh(geometry, material));
-  },
-  undefined,
-  (error) => {
-    console.error('Panorama failed to load:', panoramaPath, error);
-  }
-);
+function loadScene(sceneName) {
+  const imagePath = scenes[sceneName];
+  loader.load(imagePath, (texture) => {
+    const material = new THREE.MeshBasicMaterial({ map: texture });
+
+    const oldSphere = scene.getObjectByName('panorama');
+
+    if (oldSphere) {
+      scene.remove(oldSphere);
+      oldSphere.material.map?.dispose();
+      oldSphere.material.dispose();
+    }
+
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.name = 'panorama';
+    scene.add(sphere);
+    currentScene = sceneName;
+    updateNavigation();
+  }, undefined, (error) => {
+    console.error('Error loading texture:', imagePath, error);
+  });
+}
+loadScene('bedroom');
+
+const navMenu = document.createElement('div');
+navMenu.className = 'nav-menu';
+
+const locations =[
+  { name: 'Bedroom', scene: 'bedroom' },
+  { name: 'Living Room', scene: 'livingroom' },
+  { name: 'Bathroom', scene: 'bathroom' }
+];
+
+function updateNavigation() {
+  document.querySelectorAll('.nav-button').forEach(button => {
+    button.classList.toggle('active', button.dataset.scene === currentScene);
+  });
+}
+locations.forEach((location) => {
+  const button = document.createElement('button');
+  button.textContent = location.name;
+  button.className = 'nav-button';
+  button.dataset.scene = location.scene;
+  button.addEventListener('click', () => {
+    if (location.scene !== currentScene) {
+      loadScene(location.scene);
+    }
+  });
+  navMenu.appendChild(button);
+});
+document.body.appendChild(navMenu);
+updateNavigation();
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -53,7 +96,7 @@ controls.enableZoom = false;
 
 const minFov = 30;
 const maxFov = 100;
-const zoomSpeed = 0.5;
+const zoomSpeed = 3;
 
 window.addEventListener('wheel', (event) => {
   camera.fov += event.deltaY * 0.01 * zoomSpeed;

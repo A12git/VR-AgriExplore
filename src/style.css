@@ -29,3 +29,36 @@ canvas{
   color: #222;
   cursor: pointer;
 }
+
+
+.nav-menu {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+
+  width: max-content;
+  max-width: 95%;
+}
+
+.nav-button {
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #222;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.nav-button:hover,
+.nav-button.active {
+  background: #2e7d32;
+  color: white;
+}
