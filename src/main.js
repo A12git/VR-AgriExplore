@@ -256,3 +256,6 @@ farmMenu.querySelectorAll('.farm-card-button')
   farmMenu.classList.remove('is-hidden');
   openFarmMenuButton.style.display = 'none';
 });
+
+farmMenu.style.backgroundImage =
+  `url("${import.meta.env.BASE_URL}backgroundImg.jpg")`;

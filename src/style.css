@@ -71,7 +71,7 @@ canvas{
   box-sizing: border-box;
   padding: 35px 20px;
 
-  background: linear-gradient(135deg, #153d2b, #285b38);
+  background-image: url('/VR-AgriExplore/backgroundImg.jpg');
   color: white;
   font-family: Arial, sans-serif;
 }
