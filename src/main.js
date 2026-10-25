@@ -65,6 +65,7 @@ loadScene('farm1');
 const navMenu = document.createElement('div');
 navMenu.className = 'nav-menu';
 document.body.appendChild(navMenu);
+navMenu.style.display = 'none';
 
 function updateNavigation() {
   document.querySelectorAll('.nav-button').forEach(button => {
@@ -114,6 +115,8 @@ const startPosition = camera.position.clone();
 const startTarget = controls.target.clone();
 
 const resetButton = document.createElement('button');
+resetButton.id = 'reset-button';
+resetButton.style.display = 'none';
 resetButton.textContent = 'Reset Camera';
 resetButton.className = 'reset-button';
 document.body.appendChild(resetButton);
@@ -249,12 +252,19 @@ farmMenu.querySelectorAll('.farm-card-button')
 
       farmMenu.classList.add('is-hidden');
       openFarmMenuButton.style.display = 'block';
+
+      navMenu.style.display = 'flex';
+      resetButton.style.display = 'block';
     });
   });
 
   openFarmMenuButton.addEventListener('click', () => {
   farmMenu.classList.remove('is-hidden');
   openFarmMenuButton.style.display = 'none';
+  
+
+  navMenu.style.display = 'none';
+  resetButton.style.display = 'none';
 });
 
 farmMenu.style.backgroundImage =
