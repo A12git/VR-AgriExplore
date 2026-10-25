@@ -133,10 +133,12 @@ canvas{
 }
 
 .farm-card-image {
-  height: 175px;
+  width: 100%;
+  height: 160px;
   background-size: cover;
   background-position: center;
-  background-color: #547956;
+  background-repeat: no-repeat;
+  border-radius: 8px;
 }
 
 .farm-card-content {

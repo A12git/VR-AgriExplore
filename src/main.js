@@ -28,12 +28,15 @@ const loader = new THREE.TextureLoader();
 
 
 const scenes = {
-  bedroom: `${import.meta.env.BASE_URL}placeholder.jpg`,
+  farm1: `${import.meta.env.BASE_URL}placeholder.jpg`,
   livingroom: `${import.meta.env.BASE_URL}livingroom.jpg`,
-  bathroom: `${import.meta.env.BASE_URL}bathroom.jpg`
+  bathroom: `${import.meta.env.BASE_URL}bathroom.jpg`,
+  farm2: `${import.meta.env.BASE_URL}placeholder2.jpg`,
+  farm3: `${import.meta.env.BASE_URL}placeholder3.jpg`,
+  farm4: `${import.meta.env.BASE_URL}placeholder4.jpg`
 };
 
-let currentScene = 'bedroom';
+let currentScene = 'farm1';
 
 function loadScene(sceneName) {
   const imagePath = scenes[sceneName];
@@ -57,36 +60,35 @@ function loadScene(sceneName) {
     console.error('Error loading texture:', imagePath, error);
   });
 }
-loadScene('bedroom');
+loadScene('farm1');
 
 const navMenu = document.createElement('div');
 navMenu.className = 'nav-menu';
-
-const locations =[
-  { name: 'Bedroom', scene: 'bedroom' },
-  { name: 'Living Room', scene: 'livingroom' },
-  { name: 'Bathroom', scene: 'bathroom' }
-];
+document.body.appendChild(navMenu);
 
 function updateNavigation() {
   document.querySelectorAll('.nav-button').forEach(button => {
     button.classList.toggle('active', button.dataset.scene === currentScene);
   });
 }
-locations.forEach((location) => {
-  const button = document.createElement('button');
-  button.textContent = location.name;
-  button.className = 'nav-button';
-  button.dataset.scene = location.scene;
-  button.addEventListener('click', () => {
-    if (location.scene !== currentScene) {
+function createFarmNavigation(farm) {
+  navMenu.innerHTML = '';
+
+  farm.locations.forEach((location) => {
+    const button = document.createElement('button');
+
+    button.textContent = location.name;
+    button.className = 'nav-button';
+    button.dataset.scene = location.scene;
+
+    button.addEventListener('click', () => {
       loadScene(location.scene);
-    }
+    });
+
+    navMenu.appendChild(button);
   });
-  navMenu.appendChild(button);
-});
-document.body.appendChild(navMenu);
-updateNavigation();
+  updateNavigation();
+}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -140,22 +142,54 @@ animate();
 
 const farmOptions = [
   {name: 'Farm 1',
+    thumbnail: `${import.meta.env.BASE_URL}placeholder.jpg`,
+    scene: 'farm1',
     type: 'The products of the farm.',
     location: 'Address of the farm.',
     description: 'Description of the farm.',
+    locations:[
+      {name: 'Farm 3 - Location 1', scene: 'farm1'},
+      {name: 'Farm 3 - Location 2', scene: 'bathroom'},
+      {name: 'Farm 3 - Location 3', scene: 'livingroom'}
+    ]
   },
   {name: 'Farm 2',
+    thumbnail: `${import.meta.env.BASE_URL}placeholder2.jpg`,
+    scene: 'farm2',
     type: 'The products of the farm.',
     location: 'Address of the farm.',
     description: 'Description of the farm.',
+    locations:[
+      {name: 'Farm 3 - Location 1', scene: 'farm2'},
+      //{name: 'Farm 3 - Location 2', scene: ''},
+      //{name: 'Farm 3 - Location 3', scene: ''}
+    ]
   },
   {name: 'Farm 3',
+    thumbnail: `${import.meta.env.BASE_URL}placeholder3.jpg`,
+    scene: 'farm3',
     type: 'The products of the farm.',
     location: 'Address of the farm.',
     description: 'Description of the farm.',
+    locations:[
+      {name: 'Farm 3 - Location 1', scene: 'farm3'},
+      //{name: 'Farm 3 - Location 2', scene: ''},
+      //{name: 'Farm 3 - Location 3', scene: ''}
+    ]
+  },
+  {name: 'Farm 4',
+    thumbnail: `${import.meta.env.BASE_URL}placeholder4.jpg`,
+    scene: 'farm4',
+    type: 'The products of the farm.',
+    location: 'Address of the farm.',
+    description: 'Description of the farm.',
+    locations:[
+      {name: 'Farm 4 - Location 1', scene: 'farm4'},
+      //{name: 'Farm 4 - Location 2', scene: ''},
+      //{name: 'Farm 4 - Location 3', scene: ''}
+    ]
   }
 ];
-const farmImage = `${import.meta.env.BASE_URL}placeholder.jpg`;
 
 const farmMenu = document.createElement('section');
 farmMenu.id = 'farm-selection-screen';
@@ -174,7 +208,7 @@ farmMenu.innerHTML = `
         <article class="farm-card">
           <div
             class="farm-card-image"
-            style="background-image: url('${farmImage}');"
+            style="background-image: url('${farm.thumbnail}');"
           ></div>
 
           <div class="farm-card-content">
@@ -207,7 +241,11 @@ farmMenu.querySelectorAll('.farm-card-button')
   .forEach((button) => {
     button.addEventListener('click', () => {
       const index = Number(button.dataset.farmIndex);
+      const selectedFarm = farmOptions[index];
       console.log('Selected farm:', farmOptions[index].name);
+
+      loadScene(selectedFarm.scene);
+      createFarmNavigation(selectedFarm);
 
       farmMenu.classList.add('is-hidden');
       openFarmMenuButton.style.display = 'block';
