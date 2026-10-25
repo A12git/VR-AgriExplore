@@ -62,3 +62,164 @@ canvas{
   background: #2e7d32;
   color: white;
 }
+
+#farm-selection-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 35px 20px;
+
+  background: linear-gradient(135deg, #153d2b, #285b38);
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+#farm-selection-screen.is-hidden {
+  display: none;
+}
+
+.farm-menu-inner {
+  width: 100%;
+  max-width: 1150px;
+  margin: 0 auto;
+}
+
+.farm-menu-header {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 35px;
+}
+
+.farm-menu-label {
+  color: #a9d5a7;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 3px;
+}
+
+.farm-menu-header h1 {
+  margin: 12px 0;
+  font-size: clamp(30px, 5vw, 48px);
+}
+
+.farm-menu-header > p:last-child {
+  color: #e0eadf;
+  line-height: 1.6;
+}
+
+.farm-menu-title {
+  text-align: center;
+  margin-bottom: 22px;
+  font-size: 25px;
+}
+
+.farm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.farm-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #66836b;
+  border-radius: 14px;
+  background: #f8fbf6;
+  color: #203627;
+  box-shadow: 0 8px 25px #0002;
+}
+
+.farm-card-image {
+  height: 175px;
+  background-size: cover;
+  background-position: center;
+  background-color: #547956;
+}
+
+.farm-card-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 20px;
+}
+
+.farm-card h3 {
+  margin: 0 0 10px;
+  font-size: 21px;
+}
+
+.farm-card-type {
+  margin: 0 0 6px;
+  color: #327340;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.farm-card-location {
+  margin: 0 0 12px;
+  color: #657568;
+  font-size: 13px;
+}
+
+.farm-card-description {
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.explore-farm-button {
+  margin-top: auto;
+  padding: 12px;
+  border: none;
+  border-radius: 7px;
+  background: #39834a;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.explore-farm-button:hover {
+  background: #286a38;
+}
+
+.farm-menu-footer {
+  margin-top: 28px;
+  text-align: center;
+  color: #e0eadf;
+}
+
+#open-farm-menu {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 100;
+  padding: 11px 15px;
+  border: none;
+  border-radius: 8px;
+  background: #286a38;
+  color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 850px) {
+  .farm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  #farm-selection-screen {
+    padding: 25px 14px;
+  }
+
+  .farm-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .farm-card-image {
+    height: 190px;
+  }
+}

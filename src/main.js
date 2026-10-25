@@ -137,3 +137,84 @@ function animate() {
 }
 
 animate();
+
+const farmOptions = [
+  {name: 'Farm 1',
+    type: 'The products of the farm.',
+    location: 'Address of the farm.',
+    description: 'Description of the farm.',
+  },
+  {name: 'Farm 2',
+    type: 'The products of the farm.',
+    location: 'Address of the farm.',
+    description: 'Description of the farm.',
+  },
+  {name: 'Farm 3',
+    type: 'The products of the farm.',
+    location: 'Address of the farm.',
+    description: 'Description of the farm.',
+  }
+];
+const farmImage = `${import.meta.env.BASE_URL}placeholder.jpg`;
+
+const farmMenu = document.createElement('section');
+farmMenu.id = 'farm-selection-screen';
+
+farmMenu.innerHTML = `
+  <div class="farm-selection-container">
+    <header class="farm-selection-inner">
+      <p class="farm-menu-label">VR AgriExplore</p>
+      <h1>Explore Camarines Norte Farms</h1>
+      <p>Discover the unique characteristics and offerings of each farm in Camarines Norte.</p>
+    </header>
+
+    <h2 class="farm-menu-label">Select a Farm</h2>
+    <div class="farm-grid">
+      ${farmOptions.map((farm, index) => `
+        <article class="farm-card">
+          <div
+            class="farm-card-image"
+            style="background-image: url('${farmImage}');"
+          ></div>
+
+          <div class="farm-card-content">
+            <h3>${farm.name}</h3>
+            <p class="farm-card-type">${farm.type}</p>
+            <p><strong>Location:</strong> ${farm.location}</p>
+            <p class="farm-card-description">${farm.description}</p>
+            <button
+              type="button"
+              class="farm-card-button" data-farm-index="${index}">
+              Explore Farm 
+            </button>
+          </div>
+        </article>
+      `).join('')}
+    </div>
+    <p class="farm-menu-footer">Select A farm to begin your virtual tour.</p>
+  </div>
+`;
+document.body.appendChild(farmMenu);
+
+const openFarmMenuButton = document.createElement('button');
+openFarmMenuButton.id = 'open-farm-menu';
+openFarmMenuButton.textContent = 'Select Farm';
+openFarmMenuButton.style.display = 'none';
+
+document.body.appendChild(openFarmMenuButton);
+
+farmMenu.querySelectorAll('.farm-card-button')
+  .forEach((button) => {
+    button.addEventListener('click', () => {
+      const index = Number(button.dataset.farmIndex);
+      console.log('Selected farm:', farmOptions[index].name);
+
+      farmMenu.classList.add('is-hidden');
+      openFarmMenuButton.style.display = 'block';
+    });
+  });
+
+  openFarmMenuButton.addEventListener('click', () => {
+  farmMenu.classList.remove('is-hidden');
+  openFarmMenuButton.style.display = 'none';
+});
