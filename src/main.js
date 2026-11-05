@@ -26,6 +26,14 @@ geometry.scale(-1, 1, 1);
 
 const loader = new THREE.TextureLoader();
 
+let activeFarm = null;
+
+const arrowGroup = new THREE.Group();
+scene.add(arrowGroup);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
 
 const scenes = {
   farm1: `${import.meta.env.BASE_URL}placeholder.jpg`,
@@ -55,41 +63,98 @@ function loadScene(sceneName) {
     sphere.name = 'panorama';
     scene.add(sphere);
     currentScene = sceneName;
-    updateNavigation();
+    createGroundArrows(sceneName);
   }, undefined, (error) => {
     console.error('Error loading texture:', imagePath, error);
   });
 }
 loadScene('farm1');
 
+function createGroundArrows(sceneName) {
+  arrowGroup.clear();
+
+if (!activeFarm) return;
+
+const location = activeFarm.locations.find(
+  loc => loc.scene === sceneName
+);
+
+if (!location || !location.arrows) return;
+
+location.arrows.forEach((config) => {
+
+  const shape = new THREE.Shape();
+
+  shape.moveTo(0, 1.4);
+  shape.lineTo(0.55, 0.2);
+  shape.lineTo(0.2, 0.2);
+  shape.lineTo(0.2, -1);
+  shape.lineTo(-0.2, -1);
+  shape.lineTo(-0.2, 0.2);
+  shape.lineTo(-0.55, 0.2);
+  shape.closePath();
+
+  const geometry = new THREE.ShapeGeometry(shape);
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false
+  });
+
+  const arrow = new THREE.Mesh(geometry, material);
+
+  const position = new THREE.Vector3(
+    config.x,
+    config.y,
+    config.z
+  ).normalize().multiplyScalar(config.distance || 12);
+
+  arrow.position.copy(position);
+
+  const normal = position.clone().normalize();
+
+  arrow.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 0, 1),
+    normal
+  );
+
+  arrow.rotateZ(config.rotation || 0);
+
+  arrow.userData.target = config.target;
+
+  arrow.renderOrder = 10;
+
+  arrowGroup.add(arrow);
+});
+}
+
+renderer.domElement.addEventListener('click', (event) => {
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersections = raycaster.intersectObjects(
+    arrowGroup.children,
+    true
+  );
+
+  if (intersections.length > 0) {
+    const target = intersections[0].object.userData.target;
+
+    if (target) {
+      loadScene(target);
+    }
+  }
+});
+
 const navMenu = document.createElement('div');
 navMenu.className = 'nav-menu';
 document.body.appendChild(navMenu);
 navMenu.style.display = 'none';
 
-function updateNavigation() {
-  document.querySelectorAll('.nav-button').forEach(button => {
-    button.classList.toggle('active', button.dataset.scene === currentScene);
-  });
-}
-function createFarmNavigation(farm) {
-  navMenu.innerHTML = '';
-
-  farm.locations.forEach((location) => {
-    const button = document.createElement('button');
-
-    button.textContent = location.name;
-    button.className = 'nav-button';
-    button.dataset.scene = location.scene;
-
-    button.addEventListener('click', () => {
-      loadScene(location.scene);
-    });
-
-    navMenu.appendChild(button);
-  });
-  updateNavigation();
-}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -144,18 +209,72 @@ function animate() {
 animate();
 
 const farmOptions = [
-  {name: 'Farm 1',
-    thumbnail: `${import.meta.env.BASE_URL}placeholder.jpg`,
-    scene: 'farm1',
-    type: 'The products of the farm.',
-    location: 'Address of the farm.',
-    description: 'Description of the farm.',
-    locations:[
-      {name: 'Farm 3 - Location 1', scene: 'farm1'},
-      {name: 'Farm 3 - Location 2', scene: 'bathroom'},
-      {name: 'Farm 3 - Location 3', scene: 'livingroom'}
-    ]
-  },
+  {
+  name: 'Farm 1',
+  thumbnail: `${import.meta.env.BASE_URL}placeholder.jpg`,
+  scene: 'farm1',
+  type: 'The products of the farm.',
+  location: 'Address of the farm.',
+  description: 'Description of the farm.',
+
+  locations: [
+    {
+      name: 'Farm 1 - Entrance',
+      scene: 'farm1',
+
+      arrows: [
+        {
+          x: 0,
+          y: -0.3,
+          z: -1,
+          rotation: 180,
+          distance: 12,
+          target: 'bathroom'
+        }
+      ]
+    },
+
+    {
+      name: 'Farm 1 - Location 2',
+      scene: 'bathroom',
+
+      arrows: [
+        {
+          x: 1,
+          y: -0.3,
+          z: -1,
+          rotation: 0,
+          distance: 12,
+          target: 'livingroom'
+        },
+        {
+          x: -0.3,
+          y: -0.3,
+          z: -1,
+          rotation: Math.PI,
+          distance: 12,
+          target: 'farm1'
+        }
+      ]
+    },
+
+    {
+      name: 'Farm 1 - Location 3',
+      scene: 'livingroom',
+
+      arrows: [
+        {
+          x: 0,
+          y: -0.3,
+          z: -1,
+          rotation: 0,
+          distance: 12,
+          target: 'bathroom'
+        }
+      ]
+    }
+  ]
+},
   {name: 'Farm 2',
     thumbnail: `${import.meta.env.BASE_URL}placeholder2.jpg`,
     scene: 'farm2',
@@ -247,13 +366,12 @@ farmMenu.querySelectorAll('.farm-card-button')
       const selectedFarm = farmOptions[index];
       console.log('Selected farm:', farmOptions[index].name);
 
+      activeFarm = selectedFarm;
       loadScene(selectedFarm.scene);
-      createFarmNavigation(selectedFarm);
 
       farmMenu.classList.add('is-hidden');
       openFarmMenuButton.style.display = 'block';
 
-      navMenu.style.display = 'flex';
       resetButton.style.display = 'block';
     });
   });
@@ -262,8 +380,6 @@ farmMenu.querySelectorAll('.farm-card-button')
   farmMenu.classList.remove('is-hidden');
   openFarmMenuButton.style.display = 'none';
   
-
-  navMenu.style.display = 'none';
   resetButton.style.display = 'none';
 });
 
