@@ -224,3 +224,16 @@ canvas{
     height: 190px;
   }
 }
+
+#arrow-tooltip {
+  position: fixed;
+  display: none;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 100;
+  transform: translate(12px, 12px);
+}

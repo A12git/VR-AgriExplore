@@ -34,6 +34,39 @@ scene.add(arrowGroup);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+const arrowTooltip = document.getElementById('arrow-tooltip');
+
+renderer.domElement.addEventListener('mousemove', (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersections = raycaster.intersectObjects(
+    arrowGroup.children,
+    true
+  );
+
+  if (intersections.length > 0) {
+    const target = intersections[0].object.userData.target;
+
+    const destination = activeFarm?.locations.find(
+      loc => loc.scene === target
+    );
+
+    arrowTooltip.textContent = destination
+      ? destination.name
+      : target;
+
+    arrowTooltip.style.display = 'block';
+    arrowTooltip.style.left = `${event.clientX}px`;
+    arrowTooltip.style.top = `${event.clientY}px`;
+  } else {
+    arrowTooltip.style.display = 'none';
+  }
+});
 
 const scenes = {
   farm1: `${import.meta.env.BASE_URL}placeholder.jpg`,
@@ -224,10 +257,10 @@ const farmOptions = [
 
       arrows: [
         {
-          x: 0,
-          y: -0.3,
-          z: -1,
-          rotation: 180,
+          x: -2,
+          y: -0.5,
+          z: -5,
+          rotation: 90,
           distance: 12,
           target: 'bathroom'
         }
@@ -235,7 +268,7 @@ const farmOptions = [
     },
 
     {
-      name: 'Farm 1 - Location 2',
+      name: 'Farm 1 - Bathroom',
       scene: 'bathroom',
 
       arrows: [
