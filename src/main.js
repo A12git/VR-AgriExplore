@@ -34,40 +34,6 @@ scene.add(arrowGroup);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-const arrowTooltip = document.getElementById('arrow-tooltip');
-
-renderer.domElement.addEventListener('mousemove', (event) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-
-  const intersections = raycaster.intersectObjects(
-    arrowGroup.children,
-    true
-  );
-
-  if (intersections.length > 0) {
-    const target = intersections[0].object.userData.target;
-
-    const destination = activeFarm?.locations.find(
-      loc => loc.scene === target
-    );
-
-    arrowTooltip.textContent = destination
-      ? destination.name
-      : target;
-
-    arrowTooltip.style.display = 'block';
-    arrowTooltip.style.left = `${event.clientX}px`;
-    arrowTooltip.style.top = `${event.clientY}px`;
-  } else {
-    arrowTooltip.style.display = 'none';
-  }
-});
-
 const scenes = {
   farm1: `${import.meta.env.BASE_URL}placeholder.jpg`,
   livingroom: `${import.meta.env.BASE_URL}livingroom.jpg`,
@@ -162,13 +128,12 @@ location.arrows.forEach((config) => {
 });
 }
 
-function handleArrowClick(event) {
+const arrowTooltip = document.getElementById('arrow-tooltip');
+
+let selectedArrow = null;
+
+function getArrowAtPosition(x, y) {
   const rect = renderer.domElement.getBoundingClientRect();
-
-  const x = event.clientX ?? event.changedTouches?.[0].clientX;
-  const y = event.clientY ?? event.changedTouches?.[0].clientY;
-
-  if (x === undefined || y === undefined) return;
 
   mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
@@ -180,18 +145,78 @@ function handleArrowClick(event) {
     true
   );
 
-  if (intersections.length > 0) {
-    const target = intersections[0].object.userData.target;
-
-    if (target) {
-      loadScene(target);
-    }
-  }
+  return intersections.length > 0
+    ? intersections[0].object
+    : null;
 }
 
-renderer.domElement.addEventListener('click', handleArrowClick);
+function showArrowTooltip(arrow, x, y) {
+  const target = arrow.userData.target;
 
-renderer.domElement.addEventListener('touchend', handleArrowClick);
+  const destination = activeFarm?.locations.find(
+    loc => loc.scene === target
+  );
+
+  arrowTooltip.textContent = destination
+    ? destination.name
+    : target;
+
+  arrowTooltip.style.left = `${x}px`;
+  arrowTooltip.style.top = `${y}px`;
+  arrowTooltip.style.display = 'block';
+}
+
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (event.pointerType !== 'mouse') return;
+
+  const arrow = getArrowAtPosition(
+    event.clientX,
+    event.clientY
+  );
+
+  if (arrow) {
+    showArrowTooltip(arrow, event.clientX, event.clientY);
+  } else {
+    arrowTooltip.style.display = 'none';
+  }
+});
+
+renderer.domElement.addEventListener('pointerup', (event) => {
+  const arrow = getArrowAtPosition(
+    event.clientX,
+    event.clientY
+  );
+
+  if (!arrow) {
+    selectedArrow = null;
+    arrowTooltip.style.display = 'none';
+    return;
+  }
+
+  const target = arrow.userData.target;
+
+  if (event.pointerType !== 'mouse') {
+    if (selectedArrow !== arrow) {
+      selectedArrow = arrow;
+
+      showArrowTooltip(
+        arrow,
+        event.clientX,
+        event.clientY
+      );
+
+      return;
+    }
+  }
+
+  selectedArrow = null;
+  arrowTooltip.style.display = 'none';
+
+  if (target) {
+    loadScene(target);
+  }
+});
+
 
 const navMenu = document.createElement('div');
 navMenu.className = 'nav-menu';
