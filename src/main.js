@@ -162,10 +162,16 @@ location.arrows.forEach((config) => {
 });
 }
 
-renderer.domElement.addEventListener('click', (event) => {
+function handleArrowClick(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
 
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  const x = event.clientX ?? event.changedTouches?.[0].clientX;
+  const y = event.clientY ?? event.changedTouches?.[0].clientY;
+
+  if (x === undefined || y === undefined) return;
+
+  mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
@@ -181,7 +187,11 @@ renderer.domElement.addEventListener('click', (event) => {
       loadScene(target);
     }
   }
-});
+}
+
+renderer.domElement.addEventListener('click', handleArrowClick);
+
+renderer.domElement.addEventListener('touchend', handleArrowClick);
 
 const navMenu = document.createElement('div');
 navMenu.className = 'nav-menu';
