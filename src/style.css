@@ -240,3 +240,36 @@ canvas{
   white-space: nowrap;
   transform: translate(-50%, -130%);
 }
+
+#hotspot-info{
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  max-width: 85%;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  z-index: 100;
+}
+#hotspot-info button {
+  float: right;
+  cursor: pointer;
+  font-size: 20px;
+}
+#hotspot-thumbnail {
+  width: 100px;
+  height: 75px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+#hotspot-image {
+  width: 100%;
+  max-height: 250px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-top: 10px;
+}

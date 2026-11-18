@@ -63,6 +63,7 @@ function loadScene(sceneName) {
     scene.add(sphere);
     currentScene = sceneName;
     createGroundArrows(sceneName);
+    createHotspots(sceneName);
   }, undefined, (error) => {
     console.error('Error loading texture:', imagePath, error);
   });
@@ -223,6 +224,98 @@ navMenu.className = 'nav-menu';
 document.body.appendChild(navMenu);
 navMenu.style.display = 'none';
 
+const hotspotGroup = new THREE.Group();
+scene.add(hotspotGroup);
+
+const hotspotRaycaster = new THREE.Raycaster();
+const hotspotMouse = new THREE.Vector2();
+
+const hotspotInfo = document.getElementById('hotspot-info');
+const hotspotTitle = document.getElementById('hotspot-title');
+const hotspotDescription = document.getElementById('hotspot-description');
+const closeHotspotButton = document.getElementById('close-hotspot');
+const hotspotThumbnail = document.getElementById('hotspot-thumbnail');
+const hotspotImage = document.getElementById('hotspot-image');
+
+// Define hotspots for each scene
+const farmHotspots = {
+  farm1:[
+  { 
+    title: 'TV',
+    description: 'This is a TV.',
+    position: new THREE.Vector3(-1, 0, -10),
+    size: 0.5,
+    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
+    image: `${import.meta.env.BASE_URL}bed_image.jpg`
+  },
+  {
+    title: 'Bed',
+    description: 'This is a bed.',
+    position: new THREE.Vector3(-1, -5, 15),
+    size: 1.5,
+    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
+    image: `${import.meta.env.BASE_URL}bed_image.jpg`
+  }]
+};
+
+function createHotspots(sceneName) {
+  hotspotGroup.clear();
+
+  const hotspots = farmHotspots[sceneName] || [];
+
+  hotspots.forEach((information) => {
+  const texture = new THREE.TextureLoader().load(
+  information.thumbnail
+);
+
+const material = new THREE.SpriteMaterial({
+  map: texture,
+  transparent: true
+});
+
+const hotspot = new THREE.Sprite(material);
+
+hotspot.position.copy(information.position);
+hotspot.scale.set(
+  information.size,
+  information.size,
+  1
+);
+
+hotspot.userData.information = information;
+
+hotspotGroup.add(hotspot);
+  });
+}
+
+createHotspots(new THREE.Vector3(0, 0, -10), farmHotspots[0]);
+createHotspots(new THREE.Vector3(5, 0, -8), farmHotspots[1]);
+
+renderer.domElement.addEventListener('pointerup', (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  hotspotMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  hotspotMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  hotspotRaycaster.setFromCamera(hotspotMouse, camera);
+
+  const hits = hotspotRaycaster.intersectObjects(hotspotGroup.children);
+
+if (hits.length > 0) {
+  const information = hits[0].object.userData.information;
+  hotspotTitle.textContent = information.title;
+  hotspotDescription.textContent = information.description;
+
+  hotspotThumbnail.src = information.thumbnail || '';
+  hotspotImage.src = information.image || '';
+  
+  hotspotInfo.style.display = 'block';
+}
+});
+
+closeHotspotButton.addEventListener('click', () => {
+  hotspotInfo.style.display = 'none';
+});
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -276,6 +369,7 @@ function animate() {
 
 animate();
 
+// Farm Arrows, and Data
 const farmOptions = [
   {
   name: 'Farm 1',
@@ -287,7 +381,7 @@ const farmOptions = [
 
   locations: [
     {
-      name: 'Farm 1 - Entrance',
+      name: 'Bed Room',
       scene: 'farm1',
 
       arrows: [
@@ -303,7 +397,7 @@ const farmOptions = [
     },
 
     {
-      name: 'Farm 1 - Bathroom',
+      name: 'Bathroom',
       scene: 'bathroom',
 
       arrows: [
@@ -319,7 +413,7 @@ const farmOptions = [
           x: -0.3,
           y: -0.3,
           z: -1,
-          rotation: Math.PI,
+          rotation: 0,
           distance: 12,
           target: 'farm1'
         }
@@ -327,7 +421,7 @@ const farmOptions = [
     },
 
     {
-      name: 'Farm 1 - Location 3',
+      name: 'Living Room',
       scene: 'livingroom',
 
       arrows: [
