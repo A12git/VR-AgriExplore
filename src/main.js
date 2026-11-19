@@ -234,29 +234,47 @@ const hotspotInfo = document.getElementById('hotspot-info');
 const hotspotTitle = document.getElementById('hotspot-title');
 const hotspotDescription = document.getElementById('hotspot-description');
 const closeHotspotButton = document.getElementById('close-hotspot');
-const hotspotThumbnail = document.getElementById('hotspot-thumbnail');
 const hotspotImage = document.getElementById('hotspot-image');
 
-// Define hotspots for each scene
-const farmHotspots = {
-  farm1:[
-  { 
-    title: 'TV',
-    description: 'This is a TV.',
-    position: new THREE.Vector3(-1, 0, -10),
-    size: 0.5,
-    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
-    image: `${import.meta.env.BASE_URL}bed_image.jpg`
-  },
-  {
-    title: 'Bed',
-    description: 'This is a bed.',
-    position: new THREE.Vector3(-1, -5, 15),
-    size: 1.5,
-    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
-    image: `${import.meta.env.BASE_URL}bed_image.jpg`
-  }]
-};
+
+function makeCircularTexture(imagePath) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+
+  const context = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const image = new Image();
+
+  image.onload = () => {
+    const size = Math.min(image.width, image.height);
+    const x = (image.width - size) / 2;
+    const y = (image.height - size) / 2;
+
+    context.save();
+    context.beginPath();
+    context.arc(128, 128, 128, 0, Math.PI * 2);
+    context.clip();
+
+    context.drawImage(
+      image,
+      x, y, size, size,
+      0, 0, 256, 256
+    );
+
+    context.restore();
+    texture.needsUpdate = true;
+  };
+
+  image.onerror = () => {
+    console.error('Could not load hotspot thumbnail:', imagePath);
+  };
+
+  image.src = imagePath;
+
+  return texture;
+}
 
 function createHotspots(sceneName) {
   hotspotGroup.clear();
@@ -264,32 +282,46 @@ function createHotspots(sceneName) {
   const hotspots = farmHotspots[sceneName] || [];
 
   hotspots.forEach((information) => {
-  const texture = new THREE.TextureLoader().load(
-  information.thumbnail
-);
+    let hotspot;
 
-const material = new THREE.SpriteMaterial({
-  map: texture,
-  transparent: true
-});
+    if (information.thumbnail) {
+      const texture = makeCircularTexture(information.thumbnail);
 
-const hotspot = new THREE.Sprite(material);
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
+      });
 
-hotspot.position.copy(information.position);
-hotspot.scale.set(
-  information.size,
-  information.size,
-  1
-);
+      hotspot = new THREE.Sprite(material);
 
-hotspot.userData.information = information;
+      hotspot.scale.set(
+        information.size || 1,
+        information.size || 1,
+        1
+      );
 
-hotspotGroup.add(hotspot);
+    } else {
+      const geometry = new THREE.CircleGeometry(
+        information.size || 0.5,
+        32
+      );
+
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        side: THREE.DoubleSide
+      });
+
+      hotspot = new THREE.Mesh(geometry, material);
+      hotspot.lookAt(camera.position);
+    }
+
+    hotspot.position.copy(information.position);
+    hotspot.userData.information = information;
+
+    hotspotGroup.add(hotspot);
   });
 }
-
-createHotspots(new THREE.Vector3(0, 0, -10), farmHotspots[0]);
-createHotspots(new THREE.Vector3(5, 0, -8), farmHotspots[1]);
+  
 
 renderer.domElement.addEventListener('pointerup', (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -306,7 +338,6 @@ if (hits.length > 0) {
   hotspotTitle.textContent = information.title;
   hotspotDescription.textContent = information.description;
 
-  hotspotThumbnail.src = information.thumbnail || '';
   hotspotImage.src = information.image || '';
   
   hotspotInfo.style.display = 'block';
@@ -437,18 +468,33 @@ const farmOptions = [
     }
   ]
 },
+
+
   {name: 'Farm 2',
     thumbnail: `${import.meta.env.BASE_URL}placeholder2.jpg`,
     scene: 'farm2',
     type: 'The products of the farm.',
     location: 'Address of the farm.',
     description: 'Description of the farm.',
-    locations:[
-      {name: 'Farm 3 - Location 1', scene: 'farm2'},
-      //{name: 'Farm 3 - Location 2', scene: ''},
-      //{name: 'Farm 3 - Location 3', scene: ''}
+
+  locations:[
+    {name: 'Farm 2 - Location 1',
+    scene: 'farm2',
+    arrows: [
+      {
+        x: 0,
+        y: -0.3,
+        z: -1,
+        rotation: 0,
+        distance: 12,
+        target: 'farm1'
+      }
     ]
   },
+    ]
+  },
+
+
   {name: 'Farm 3',
     thumbnail: `${import.meta.env.BASE_URL}placeholder3.jpg`,
     scene: 'farm3',
@@ -474,6 +520,34 @@ const farmOptions = [
     ]
   }
 ];
+
+// Define hotspots for each scene
+const farmHotspots = {
+  farm1:[
+  { 
+    title: 'TV',
+    description: 'This is a TV.',
+    position: new THREE.Vector3(-1, 0, -10),
+    size: 0.5,
+    image: `${import.meta.env.BASE_URL}bed_image.jpg`
+  },
+  {
+    title: 'Bed',
+    description: 'This is a bed.',
+    position: new THREE.Vector3(-1, -5, 15),
+    size: 1.5,
+    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
+    image: `${import.meta.env.BASE_URL}bed_image.jpg`
+  }],
+  farm2:[
+    {
+      title: 'Farm 2 Hotspot',
+      description: 'This is a hotspot for Farm 2.',
+      position: new THREE.Vector3(0, 0, -10),
+      size: 0.5,
+    }
+  ]
+};
 
 const farmMenu = document.createElement('section');
 farmMenu.id = 'farm-selection-screen';
