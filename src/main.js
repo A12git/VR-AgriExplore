@@ -1369,7 +1369,7 @@ farmMenu.style.backgroundImage =
 
 
 
-const TESTING_MODE = true;
+const TESTING_MODE = false;
 const TEST_SCENE = 'fatimaFarm8';
 
 if (TESTING_MODE) {
