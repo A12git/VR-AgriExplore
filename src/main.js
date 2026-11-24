@@ -125,6 +125,17 @@ const scenes = {
   ibericaFarm7: `${import.meta.env.BASE_URL}iberica/END OF FARM.jpg`,
   ibericaFarmCanopyEggplant: `${import.meta.env.BASE_URL}iberica/RIGHT CANOPY EGGPLANT.jpg`,
   //Iberica Farm
+  //Fatima Farm
+  fatimaFarm1: `${import.meta.env.BASE_URL}fatima/GATE 1.jpg`,
+  fatimaFarm2: `${import.meta.env.BASE_URL}fatima/GATE 2.jpg`,
+  fatimaFarm3: `${import.meta.env.BASE_URL}fatima/AFTER GATE 4.jpg`,
+  fatimaFarm4: `${import.meta.env.BASE_URL}fatima/AFTER GATE 5.jpg`,
+  fatimaFarm5: `${import.meta.env.BASE_URL}fatima/AFTER GATE FINAL.jpg`,
+  fatimaFarm6: `${import.meta.env.BASE_URL}fatima/BEGINNING SLOPE.jpg`,
+  fatimaFarm7: `${import.meta.env.BASE_URL}fatima/SLOPE 1.jpg`,
+  fatimaFarm8: `${import.meta.env.BASE_URL}fatima/SLOPE 2.jpg`,
+  fatimaFarm9: `${import.meta.env.BASE_URL}fatima/AFTER NG SLOPE.jpg`,
+  //Fatima Farm
   //Fundado Cow Farm
   cowFarmEntrance: `${import.meta.env.BASE_URL}fundado/1.jpg`,
   cowFarm2: `${import.meta.env.BASE_URL}fundado/2.jpg`,
@@ -800,24 +811,157 @@ const farmOptions = [
 },
 
 
-  {name: 'Farm 2',
-    thumbnail: `${import.meta.env.BASE_URL}placeholder2.jpg`,
-    scene: 'farm2',
-    type: 'The products of the farm.',
+  {name: 'Fatima Farm Gate',
+    thumbnail: `${import.meta.env.BASE_URL}fatima/GATE 1.jpg`,
+    scene: 'fatimaFarm1',
+    type: 'This a Farm and a Resort.',
     location: 'Address of the farm.',
-    description: 'Description of the farm.',
+    description: 'This farm has Dragon fruits, Chickens and other amenities just like a regular resort it has a swimming pool.',
 
   locations:[
-    {name: 'Farm 2 - Location 1',
-    scene: 'farm2',
+    {name: 'Entrance Gate',
+    scene: 'fatimaFarm1',
+    cameraView:{yaw:-90,pitch:0},
     arrows: [
       {
-        x: 0,
-        y: -0.3,
-        z: -1,
+        yaw:-90,
+        pitch:-15,
         rotation: 0,
         distance: 12,
-        target: 'farm1'
+        target: 'fatimaFarm2'
+      }
+    ]
+  },
+  {name: 'Entrance',
+    scene: 'fatimaFarm2',
+    arrows: [
+      {
+        yaw:-90,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm3'
+      },
+      {
+        yaw:130,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm1'
+      }
+    ]
+  },
+  {name: 'Path 1',
+    scene: 'fatimaFarm3',
+    arrows: [
+      {
+        yaw:-100,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm4'
+      },
+      {
+        yaw:80,
+        pitch:0,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm2'
+      }
+    ]
+  },
+  {name: 'Path 2',
+    scene: 'fatimaFarm4',
+    arrows: [
+      {
+        yaw:-123,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm5'
+      },
+      {
+        yaw:65,
+        pitch:-2,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm3'
+      }
+    ]
+  },
+  {name: 'Path 3',
+    scene: 'fatimaFarm5',
+    arrows: [
+      {
+        yaw:-97,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm6'
+      },
+      {
+        yaw:94,
+        pitch:-2,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm4'
+      }
+    ]
+  },
+  {name: 'Path 4',
+    scene: 'fatimaFarm6',
+    arrows: [
+      {
+        yaw:-97,
+        pitch:-10,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm7'
+      },
+      {
+        yaw:83,
+        pitch:-2,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm5'
+      }
+    ]
+  },
+  {name: 'Path 5',
+    scene: 'fatimaFarm7',
+    arrows: [
+      {
+        yaw:-96,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm8'
+      },
+      {
+        yaw:65,
+        pitch:-2,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm6'
+      }
+    ]
+  },
+  {name: 'Path 6',
+    scene: 'fatimaFarm8',
+    arrows: [
+      {
+        yaw:-95,
+        pitch:-5,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm9'
+      },
+      {
+        yaw:85,
+        pitch:-2,
+        rotation: 0,
+        distance: 12,
+        target: 'fatimaFarm7'
       }
     ]
   },
@@ -1226,7 +1370,7 @@ farmMenu.style.backgroundImage =
 
 
 const TESTING_MODE = true;
-const TEST_SCENE = 'ibericaFarm5';
+const TEST_SCENE = 'fatimaFarm8';
 
 if (TESTING_MODE) {
   farmMenu.style.display = 'none';
