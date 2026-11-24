@@ -4,6 +4,31 @@ import * as THREE from 'three';
 import { OrbitControls } from
   'three/addons/controls/OrbitControls.js';
 
+function setInitialCameraView(sceneName) {
+  const location = activeFarm?.locations.find(
+    loc => loc.scene === sceneName
+  );
+
+  if (!location || !location.cameraView) return;
+
+  const yaw = THREE.MathUtils.degToRad(
+    location.cameraView.yaw || 0
+  );
+
+  const pitch = THREE.MathUtils.degToRad(
+    location.cameraView.pitch || 0
+  );
+
+  const direction = new THREE.Vector3(
+    Math.sin(yaw) * Math.cos(pitch),
+    Math.sin(pitch),
+    -Math.cos(yaw) * Math.cos(pitch)
+  );
+
+  controls.target.copy(direction);
+  controls.update();
+}
+
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
@@ -26,6 +51,59 @@ geometry.scale(-1, 1, 1);
 
 const loader = new THREE.TextureLoader();
 
+// Store loaded panorama textures
+const textureCache = new Map();
+const texturePromises = new Map();
+
+function getPanoramaTexture(path) {
+  // Already loaded
+  if (textureCache.has(path)) {
+    return Promise.resolve(textureCache.get(path));
+  }
+
+  // Currently loading
+  if (texturePromises.has(path)) {
+    return texturePromises.get(path);
+  }
+
+  // Load for the first time
+  const promise = new Promise((resolve, reject) => {
+    loader.load(
+      path,
+      (texture) => {
+        textureCache.set(path, texture);
+        texturePromises.delete(path);
+        resolve(texture);
+      },
+      undefined,
+      (error) => {
+        texturePromises.delete(path);
+        reject(error);
+      }
+    );
+  });
+
+  texturePromises.set(path, promise);
+  return promise;
+}
+
+function preloadFarmImages(farm, currentSceneName) {
+  if (!farm || !farm.locations) return;
+
+  farm.locations.forEach((location) => {
+    // Skip the panorama currently being displayed
+    if (location.scene === currentSceneName) return;
+
+    const imagePath = scenes[location.scene];
+
+    if (imagePath) {
+      getPanoramaTexture(imagePath).catch((error) => {
+        console.error('Preload failed:', imagePath, error);
+      });
+    }
+  });
+}
+
 let activeFarm = null;
 
 const arrowGroup = new THREE.Group();
@@ -34,7 +112,40 @@ scene.add(arrowGroup);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+
+//images
 const scenes = {
+  //Iberica Farm
+  ibericaFarm1: `${import.meta.env.BASE_URL}iberica/OUTSIDE GATE.jpg`,
+  ibericaFarm2: `${import.meta.env.BASE_URL}iberica/START.jpg`,
+  ibericaFarm3: `${import.meta.env.BASE_URL}iberica/2.jpg`,
+  ibericaFarm4: `${import.meta.env.BASE_URL}iberica/3.jpg`,
+  ibericaFarm5: `${import.meta.env.BASE_URL}iberica/4.jpg`,
+  ibericaFarm6: `${import.meta.env.BASE_URL}iberica/BEFORE END PART FARM.jpg`,
+  ibericaFarm7: `${import.meta.env.BASE_URL}iberica/END OF FARM.jpg`,
+  ibericaFarmCanopyEggplant: `${import.meta.env.BASE_URL}iberica/RIGHT CANOPY EGGPLANT.jpg`,
+  //Iberica Farm
+  //Fundado Cow Farm
+  cowFarmEntrance: `${import.meta.env.BASE_URL}fundado/1.jpg`,
+  cowFarm2: `${import.meta.env.BASE_URL}fundado/2.jpg`,
+  cowFarm3: `${import.meta.env.BASE_URL}fundado/3.jpg`,
+  cowFarm4: `${import.meta.env.BASE_URL}fundado/4.jpg`,
+  cowFarm5: `${import.meta.env.BASE_URL}fundado/5.jpg`,
+  cowFarm6: `${import.meta.env.BASE_URL}fundado/6.jpg`,
+  cowFarm7: `${import.meta.env.BASE_URL}fundado/6(1).jpg`,
+  cowFarm8: `${import.meta.env.BASE_URL}fundado/7.jpg`,
+  cowFarm9: `${import.meta.env.BASE_URL}fundado/8.jpg`,
+  cowFarm10: `${import.meta.env.BASE_URL}fundado/9.jpg`,
+  cowFarm11: `${import.meta.env.BASE_URL}fundado/10.jpg`,
+  cowFarm12: `${import.meta.env.BASE_URL}fundado/11.jpg`,
+  cowFarm13: `${import.meta.env.BASE_URL}fundado/12.jpg`,
+  cowFarm14: `${import.meta.env.BASE_URL}fundado/13.jpg`,
+  cowFarm15: `${import.meta.env.BASE_URL}fundado/14.jpg`,
+  cowFarm16: `${import.meta.env.BASE_URL}fundado/15.jpg`,
+  cowFarmMid: `${import.meta.env.BASE_URL}fundado/mid.jpg`,
+  cowFarmLast: `${import.meta.env.BASE_URL}fundado/last.jpg`,
+  //Fundado Cow Farm
+
   farm1: `${import.meta.env.BASE_URL}placeholder.jpg`,
   livingroom: `${import.meta.env.BASE_URL}livingroom.jpg`,
   bathroom: `${import.meta.env.BASE_URL}bathroom.jpg`,
@@ -45,88 +156,112 @@ const scenes = {
 
 let currentScene = 'farm1';
 
-function loadScene(sceneName) {
+let sceneLoadRequest = 0;
+
+async function loadScene(sceneName) {
   const imagePath = scenes[sceneName];
-  loader.load(imagePath, (texture) => {
-    const material = new THREE.MeshBasicMaterial({ map: texture });
+
+  if (!imagePath) {
+    console.error('Scene not found:', sceneName);
+    return;
+  }
+
+  const requestId = ++sceneLoadRequest;
+
+  // Clear old navigation arrows and hotspots immediately.
+  arrowGroup.clear();
+  hotspotGroup.clear();
+
+  // Close the information panel when changing locations.
+  hotspotInfo.style.display = 'none';
+
+  try {
+    const texture = await getPanoramaTexture(imagePath);
+
+    // Ignore an older request if another scene was selected.
+    if (requestId !== sceneLoadRequest) return;
+
+    const material = new THREE.MeshBasicMaterial({
+      map: texture
+    });
 
     const oldSphere = scene.getObjectByName('panorama');
 
     if (oldSphere) {
       scene.remove(oldSphere);
-      oldSphere.material.map?.dispose();
       oldSphere.material.dispose();
     }
 
     const sphere = new THREE.Mesh(geometry, material);
     sphere.name = 'panorama';
     scene.add(sphere);
+
     currentScene = sceneName;
+
+    setInitialCameraView(sceneName);
+
     createGroundArrows(sceneName);
     createHotspots(sceneName);
-  }, undefined, (error) => {
+
+  } catch (error) {
     console.error('Error loading texture:', imagePath, error);
-  });
+  }
 }
-loadScene('farm1');
+
+
 
 function createGroundArrows(sceneName) {
   arrowGroup.clear();
 
-if (!activeFarm) return;
+  if (!activeFarm) return;
 
-const location = activeFarm.locations.find(
-  loc => loc.scene === sceneName
-);
-
-if (!location || !location.arrows) return;
-
-location.arrows.forEach((config) => {
-
-  const shape = new THREE.Shape();
-
-  shape.moveTo(0, 1.4);
-  shape.lineTo(0.55, 0.2);
-  shape.lineTo(0.2, 0.2);
-  shape.lineTo(0.2, -1);
-  shape.lineTo(-0.2, -1);
-  shape.lineTo(-0.2, 0.2);
-  shape.lineTo(-0.55, 0.2);
-  shape.closePath();
-
-  const geometry = new THREE.ShapeGeometry(shape);
-  const material = new THREE.MeshBasicMaterial({ color: 0xffffff,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.9,
-    depthTest: false
-  });
-
-  const arrow = new THREE.Mesh(geometry, material);
-
-  const position = new THREE.Vector3(
-    config.x,
-    config.y,
-    config.z
-  ).normalize().multiplyScalar(config.distance || 12);
-
-  arrow.position.copy(position);
-
-  const normal = position.clone().normalize();
-
-  arrow.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0, 0, 1),
-    normal
+  const location = activeFarm.locations.find(
+    loc => loc.scene === sceneName
   );
 
-  arrow.rotateZ(config.rotation || 0);
+  if (!location || !location.arrows) return;
 
-  arrow.userData.target = config.target;
+  location.arrows.forEach((config) => {
 
-  arrow.renderOrder = 10;
+    // Create a simple circular navigation marker
+    const geometry = new THREE.CircleGeometry(0.35, 32);
 
-  arrowGroup.add(arrow);
-});
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+      depthWrite: false
+    });
+
+    const arrow = new THREE.Mesh(geometry, material);
+
+    const yaw = THREE.MathUtils.degToRad(config.yaw || 0);
+    const pitch = THREE.MathUtils.degToRad(config.pitch || 0);
+
+    const position = new THREE.Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      -Math.cos(yaw) * Math.cos(pitch)
+    ).multiplyScalar(config.distance || 12);
+
+    arrow.position.copy(position);
+
+    const normal = position.clone().normalize();
+
+    arrow.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      normal
+    );
+
+    arrow.rotateZ(config.rotation || 0);
+
+    arrow.userData.target = config.target;
+    arrow.renderOrder = 10;
+
+    arrowGroup.add(arrow);
+  });
 }
 
 const arrowTooltip = document.getElementById('arrow-tooltip');
@@ -182,6 +317,18 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   }
 });
 
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  const arrow = getArrowAtPosition(
+    event.clientX,
+    event.clientY
+  );
+
+  if (arrow) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 renderer.domElement.addEventListener('pointerup', (event) => {
   const arrow = getArrowAtPosition(
     event.clientX,
@@ -193,6 +340,8 @@ renderer.domElement.addEventListener('pointerup', (event) => {
     arrowTooltip.style.display = 'none';
     return;
   }
+
+  event.stopImmediatePropagation();
 
   const target = arrow.userData.target;
 
@@ -235,6 +384,39 @@ const hotspotTitle = document.getElementById('hotspot-title');
 const hotspotDescription = document.getElementById('hotspot-description');
 const closeHotspotButton = document.getElementById('close-hotspot');
 const hotspotImage = document.getElementById('hotspot-image');
+const previousImage = document.getElementById('previous-image');
+const nextImage = document.getElementById('next-image');
+const imageCounter = document.getElementById('image-counter');
+
+let currentImages = [];
+let currentImageIndex = 0;
+
+function showHotspotImage() {
+  if (currentImages.length === 0) return;
+
+  hotspotImage.src = currentImages[currentImageIndex];
+
+  imageCounter.textContent =
+    `${currentImageIndex + 1} / ${currentImages.length}`;
+}
+
+previousImage.addEventListener('click', () => {
+  if (currentImages.length === 0) return;
+
+  currentImageIndex =
+    (currentImageIndex - 1 + currentImages.length) % currentImages.length;
+
+  showHotspotImage();
+});
+
+nextImage.addEventListener('click', () => {
+  if (currentImages.length === 0) return;
+
+  currentImageIndex =
+    (currentImageIndex + 1) % currentImages.length;
+
+  showHotspotImage();
+});
 
 
 function makeCircularTexture(imagePath) {
@@ -245,12 +427,28 @@ function makeCircularTexture(imagePath) {
   const context = canvas.getContext('2d');
   const texture = new THREE.CanvasTexture(canvas);
 
+  // Draw a visible fallback while the thumbnail loads.
+  context.fillStyle = '#ff3333';
+  context.beginPath();
+  context.arc(128, 128, 120, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = '#ffffff';
+  context.font = 'bold 100px Arial';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText('C', 128, 128);
+
+  texture.needsUpdate = true;
+
   const image = new Image();
 
   image.onload = () => {
     const size = Math.min(image.width, image.height);
     const x = (image.width - size) / 2;
     const y = (image.height - size) / 2;
+
+    context.clearRect(0, 0, 256, 256);
 
     context.save();
     context.beginPath();
@@ -268,7 +466,10 @@ function makeCircularTexture(imagePath) {
   };
 
   image.onerror = () => {
-    console.error('Could not load hotspot thumbnail:', imagePath);
+    console.error(
+      'Could not load Canopy hotspot thumbnail:',
+      imagePath
+    );
   };
 
   image.src = imagePath;
@@ -276,6 +477,7 @@ function makeCircularTexture(imagePath) {
   return texture;
 }
 
+// Function to create hotspots for the current scene
 function createHotspots(sceneName) {
   hotspotGroup.clear();
 
@@ -295,10 +497,14 @@ function createHotspots(sceneName) {
       hotspot = new THREE.Sprite(material);
 
       hotspot.scale.set(
-        information.size || 1,
-        information.size || 1,
+        Math.max(information.size || 1, 1.5),
+        Math.max(information.size || 1, 1.5),
         1
       );
+
+      hotspot.renderOrder = 20;
+      hotspot.material.depthTest = false;
+      hotspot.material.depthWrite = false;
 
     } else {
       const geometry = new THREE.CircleGeometry(
@@ -315,13 +521,20 @@ function createHotspots(sceneName) {
       hotspot.lookAt(camera.position);
     }
 
-    hotspot.position.copy(information.position);
+    const yaw = THREE.MathUtils.degToRad(information.yaw || 0);
+    const pitch = THREE.MathUtils.degToRad(information.pitch || 0);
+    const distance = information.distance || 12;
+
+    hotspot.position.set(
+      Math.sin(yaw) * Math.cos(pitch) * distance,
+      Math.sin(pitch) * distance,
+      -Math.cos(yaw) * Math.cos(pitch) * distance
+    );
     hotspot.userData.information = information;
 
     hotspotGroup.add(hotspot);
   });
 }
-  
 
 renderer.domElement.addEventListener('pointerup', (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -333,15 +546,24 @@ renderer.domElement.addEventListener('pointerup', (event) => {
 
   const hits = hotspotRaycaster.intersectObjects(hotspotGroup.children);
 
-if (hits.length > 0) {
-  const information = hits[0].object.userData.information;
-  hotspotTitle.textContent = information.title;
-  hotspotDescription.textContent = information.description;
+  if (hits.length > 0) {
+    const information = hits[0].object.userData.information;
 
-  hotspotImage.src = information.image || '';
-  
-  hotspotInfo.style.display = 'block';
-}
+    hotspotTitle.textContent = information.title;
+    hotspotDescription.textContent = information.description;
+
+    currentImages = information.images || [];
+    currentImageIndex = 0;
+
+    if (currentImages.length > 0) {
+      showHotspotImage();
+      hotspotImage.style.display = 'block';
+    } else {
+      hotspotImage.style.display = 'none';
+    }
+
+    hotspotInfo.style.display = 'block';
+  }
 });
 
 closeHotspotButton.addEventListener('click', () => {
@@ -400,69 +622,177 @@ function animate() {
 
 animate();
 
-// Farm Arrows, and Data
+// FarmDataArrows
 const farmOptions = [
   {
-  name: 'Farm 1',
-  thumbnail: `${import.meta.env.BASE_URL}placeholder.jpg`,
-  scene: 'farm1',
+  name: 'Iberica Farm',
+  thumbnail: `${import.meta.env.BASE_URL}iberica/OUTSIDE GATE.jpg`,
+  scene: 'ibericaFarm1',
   type: 'The products of the farm.',
   location: 'Address of the farm.',
   description: 'Description of the farm.',
 
   locations: [
     {
-      name: 'Bed Room',
-      scene: 'farm1',
-
+      name: 'Gate',
+      scene: 'ibericaFarm1',
+      cameraView:{yaw:-90,pitch:0},
       arrows: [
         {
-          x: -2,
-          y: -0.5,
-          z: -5,
-          rotation: 90,
+          yaw: -90,
+          pitch:-20,
+          rotation: 0.2,
           distance: 12,
-          target: 'bathroom'
+          target: 'ibericaFarm2'
         }
       ]
     },
 
     {
-      name: 'Bathroom',
-      scene: 'bathroom',
-
+      name: 'Inside the Farm',
+      scene: 'ibericaFarm2',
+      cameraView:{yaw:-90,pitch:0},
       arrows: [
         {
-          x: 1,
-          y: -0.3,
-          z: -1,
+          yaw: -90,
+          pitch:-20,
           rotation: 0,
           distance: 12,
-          target: 'livingroom'
+          target: 'ibericaFarm3'
         },
         {
-          x: -0.3,
-          y: -0.3,
-          z: -1,
-          rotation: 0,
-          distance: 12,
-          target: 'farm1'
+          yaw:90,
+          pitch:-20,
+          rotation:-0.5,
+          distance: 15,
+          target: 'ibericaFarm1'
+        },
+        {
+          yaw:-30,
+          pitch:-10,
+          rotation:1.5,
+          distance: 11,
+          target: 'ibericaFarmCanopyEggplant'
         }
       ]
     },
 
     {
-      name: 'Living Room',
-      scene: 'livingroom',
+      name: 'Right Canopy Eggplant',
+      scene: 'ibericaFarmCanopyEggplant',
+      cameraView:{yaw:-90,pitch:0},
+      arrows: [
+        {
+          yaw: 80,
+          pitch:-20,
+          rotation: -0.5,
+          distance: 12,
+          target: 'ibericaFarm3'
+        }
+      ]
+    },
+
+    {
+      name: 'Path 1',
+      scene: 'ibericaFarm3',
 
       arrows: [
         {
-          x: 0,
-          y: -0.3,
-          z: -1,
+          yaw:-110,
+          pitch:-15,
           rotation: 0,
+          distance: 15,
+          target: 'ibericaFarm4'
+        },{
+          yaw:70,
+          pitch:-15,
+          rotation: -0.2,
           distance: 12,
-          target: 'bathroom'
+          target: 'ibericaFarm2'
+        },
+        {
+          yaw:-50,
+          pitch:-10,
+          rotation: 1.5,
+          distance: 18,
+          target: 'ibericaFarm5'
+        }
+      ]
+    },
+    {
+      name: 'Path 2',
+      scene: 'ibericaFarm4',
+
+      arrows: [
+        {
+          yaw:70,
+          pitch:-5,
+          rotation: -1.5,
+          distance: 18,
+          target: 'ibericaFarm5'
+        },
+        {
+          yaw:100,
+          pitch:-10,
+          rotation: 0,
+          distance: 15,
+          target: 'ibericaFarm3'
+        },
+        {
+          yaw:-90,
+          pitch:-15,
+          rotation: -1.2,
+          distance: 15,
+          target: 'ibericaFarm6'
+        }
+      ]
+    },
+    {
+      name: 'Papaya Seedlings',
+      scene: 'ibericaFarm5',
+
+      arrows: [
+        {
+          yaw:85,
+          pitch:-15,
+          rotation: -0.5,
+          distance: 12,
+          target: 'ibericaFarm3'
+        }
+      ]
+    },
+    {
+      name: 'Path 4',
+      scene: 'ibericaFarm6',
+
+      arrows: [
+        {
+          yaw:-85,
+          pitch:-20,
+          rotation: 0.5,
+          distance: 17,
+          target: 'ibericaFarm7'
+        },
+        {
+          yaw:130,
+          pitch:-20,
+          rotation: 0.5,
+          distance: 17,
+          target: 'ibericaFarm4'
+        }
+      ]
+    },
+    {
+      name: 'End of farm',
+      scene: 'ibericaFarm7',
+
+      arrows: [
+        {
+          yaw:120,
+          pitch:-15,
+          rotation: 0,
+          distance: 15,
+          target: 'ibericaFarm6'
         }
       ]
     }
@@ -494,19 +824,290 @@ const farmOptions = [
     ]
   },
 
-
-  {name: 'Farm 3',
-    thumbnail: `${import.meta.env.BASE_URL}placeholder3.jpg`,
-    scene: 'farm3',
+//FarmFundado
+  {name: 'Fundado Cow Farm',
+    thumbnail: `${import.meta.env.BASE_URL}fundado/1.jpg`,
+    scene: 'cowFarmEntrance',
     type: 'The products of the farm.',
     location: 'Address of the farm.',
     description: 'Description of the farm.',
     locations:[
-      {name: 'Farm 3 - Location 1', scene: 'farm3'},
-      //{name: 'Farm 3 - Location 2', scene: ''},
-      //{name: 'Farm 3 - Location 3', scene: ''}
+      {name: 'Fundado Cow Farm Entrance',
+        scene: 'cowFarmEntrance',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -90,
+          pitch: -15,
+          rotation: -0.9,
+          distance: 12,
+          target: 'cowFarm2'
+        }]},
+      {name: 'Fundado Cow Farm Path 1',
+        scene: 'cowFarm2',
+        cameraView: { yaw: -120, pitch: 0 },
+        arrows: [{
+          yaw: 95,
+          pitch: -15,
+          rotation: 0.1,
+          distance: 12,
+          target: 'cowFarmEntrance'
+      },
+      {
+        yaw: -120,
+        pitch:-15,
+        rotation: -0.8,
+        distance: 12,
+        target: 'cowFarm4'
+      }
+          
+      ]},
+      {name: 'Fundado Cow Farm Path 2',
+        scene: 'cowFarm4',
+        cameraView: { yaw: -80, pitch: 0 },
+        arrows: [{
+          yaw: -80,
+          pitch: -15,
+          rotation: 0.6,
+          distance: 12,
+          target: 'cowFarm5'
+        },{
+          yaw: 87,
+          pitch:-40,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm2'
+        },
+      ]},
+      {name: 'Fundado Cow Farm Path 3',
+        scene: 'cowFarm5',
+        cameraView: { yaw: -80, pitch: 0 },
+        arrows: [{
+          yaw: -80,
+          pitch:-10,
+          rotation: 0.9,
+          distance: 16,
+          target: 'cowFarm6'
+        },{
+          yaw: 87,
+          pitch:-15,
+          rotation: -0.5,
+          distance: 12,
+          target: 'cowFarm4'
+        },]},
+      {name: 'Fundado Cow Farm Path 4',
+        scene: 'cowFarm6',
+        cameraView: { yaw: -70, pitch: 0 },
+        arrows: [{
+          yaw: -70,
+          pitch:-15,
+          rotation: 0.5,
+          distance: 15,
+          target: 'cowFarm7'
+        },{
+          yaw: 100,
+          pitch:-15,
+          rotation: -0.5,
+          distance: 12,
+          target: 'cowFarm5'
+        },]},
+      {name: 'Fundado Cow Farm path 5',
+        scene: 'cowFarm7',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw:-90,
+          pitch:-15,
+          rotation: 0.40,
+          distance: 15,
+          target: 'cowFarm8'
+        },{
+          yaw: 75,
+          pitch:-15,
+          rotation: -0.5,
+          distance: 12,
+          target: 'cowFarm6'
+        },]},
+
+        {name: 'Fundado Cow Farm Barrels',
+        scene: 'cowFarm8',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw:-92,
+          pitch:-15,
+          rotation: 0.25,
+          distance: 12,
+          target: 'cowFarm9'
+        },{
+          yaw: 0,
+          pitch:-15,
+          rotation: 2,
+          distance: 12,
+          target: 'cowFarm7'
+        },]},
+
+        {name: 'Fundado Cow Farm Barrels 2',
+        scene: 'cowFarm9',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -96,
+          pitch:-16,
+          rotation: 0,
+          distance: 12,
+          target: 'cowFarm10'
+        },{
+          yaw: 87,
+          pitch:-15,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm8'
+        },]},
+        {name: 'Fundado Cow Farm Barrels 3',
+        scene: 'cowFarm10',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -75,
+          pitch:-16,
+          rotation: 0.5,
+          distance: 12,
+          target: 'cowFarm11'
+        },{
+          yaw: 105,
+          pitch:-20,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm9'
+        },]},
+        {name: 'Fundado Cow Farm Barrels 4',
+        scene: 'cowFarm11',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -96,
+          pitch:-16,
+          rotation: 0,
+          distance: 12,
+          target: 'cowFarm12'
+        },{
+          yaw: 82,
+          pitch:-15,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm10'
+        },]},
+        {name: 'Fundado Cow Farm Cows',
+        scene: 'cowFarm12',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -93,
+          pitch:-16,
+          rotation: 0.1,
+          distance: 12,
+          target: 'cowFarm13'
+        },{
+          yaw: 87,
+          pitch:-15,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm11'
+        },]},
+
+        {name: 'Fundado Cow Farm Cows 2',
+        scene: 'cowFarm13',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -90,
+          pitch:-16,
+          rotation: 0.150,
+          distance: 12,
+          target: 'cowFarmMid'
+        },{
+          yaw: 90,
+          pitch:-15,
+          rotation: -0.1,
+          distance: 12,
+          target: 'cowFarm12'
+        },]},
+
+        {name: 'Fundado Cow Farm Cows 3',
+        scene: 'cowFarmMid',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -90,
+          pitch:-16,
+          rotation: 0.25,
+          distance: 12,
+          target: 'cowFarm15'
+        },{
+          yaw: 93,
+          pitch:-16,
+          rotation: -0.2,
+          distance: 12,
+          target: 'cowFarm13'
+        },]},
+
+        {name: 'Fundado Cow Farm Cows 4',
+        scene: 'cowFarm15',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -18,
+          pitch: -16,
+          rotation: 1.5,
+          distance: 12,
+          target: 'cowFarm16'
+        },{
+          yaw: 165,
+          pitch:-16,
+          rotation: -0.1,
+          distance: 12,
+          target: 'cowFarmMid'
+        },]},
+
+        {name: 'Fundado Cow Farm Cows 5',
+        scene: 'cowFarm14',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -90,
+          pitch:-16,
+          rotation: 0.25,
+          distance: 12,
+          target: 'cowFarm15'
+        },{
+          yaw: 87,
+          pitch:-16,
+          rotation: -0.199,
+          distance: 12,
+          target: 'cowFarm15'
+        },]},
+
+        {name: 'Fundado Cow Farm Exit',
+        scene: 'cowFarm16',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: -97,
+          pitch:-16,
+          rotation: 0.2,
+          distance: 12,
+          target: 'cowFarmLast'
+        },{
+          yaw: 80,
+          pitch:-16,
+          rotation: -0.5,
+          distance: 12,
+          target: 'cowFarm14'
+        },]},
+        
+        {name: 'Fundado Cow Farm Outside Pens',
+        scene: 'cowFarmLast',
+        cameraView: { yaw: -90, pitch: 0 },
+        arrows: [{
+          yaw: 87,
+          pitch:-16,
+          rotation: -0.25,
+          distance: 12,
+          target: 'cowFarm16'
+        }]},
     ]
   },
+
+
   {name: 'Farm 4',
     thumbnail: `${import.meta.env.BASE_URL}placeholder4.jpg`,
     scene: 'farm4',
@@ -521,23 +1122,18 @@ const farmOptions = [
   }
 ];
 
-// Define hotspots for each scene
+//FarmHotspotData
 const farmHotspots = {
-  farm1:[
+  ibericaFarm2:[
   { 
-    title: 'TV',
-    description: 'This is a TV.',
-    position: new THREE.Vector3(-1, 0, -10),
+    title: 'Canopy',
+    description: 'In the right canopy they planted some eggplant and at the middle of the two structure there are Papaya Trees.',
+    yaw:-45,
+    pitch:-10,
+    distance:12,
     size: 0.5,
-    image: `${import.meta.env.BASE_URL}bed_image.jpg`
-  },
-  {
-    title: 'Bed',
-    description: 'This is a bed.',
-    position: new THREE.Vector3(-1, -5, 15),
-    size: 1.5,
-    thumbnail: `${import.meta.env.BASE_URL}bed_thubnail.jpg`,
-    image: `${import.meta.env.BASE_URL}bed_image.jpg`
+    thumbnail: `${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`,
+    images: [`${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`]
   }],
   farm2:[
     {
@@ -548,6 +1144,8 @@ const farmHotspots = {
     }
   ]
 };
+
+//loadScene('farm1');
 
 const farmMenu = document.createElement('section');
 farmMenu.id = 'farm-selection-screen';
@@ -603,7 +1201,10 @@ farmMenu.querySelectorAll('.farm-card-button')
       console.log('Selected farm:', farmOptions[index].name);
 
       activeFarm = selectedFarm;
+
       loadScene(selectedFarm.scene);
+
+      preloadFarmImages(selectedFarm, selectedFarm.scene);
 
       farmMenu.classList.add('is-hidden');
       openFarmMenuButton.style.display = 'block';
@@ -621,3 +1222,22 @@ farmMenu.querySelectorAll('.farm-card-button')
 
 farmMenu.style.backgroundImage =
   `url("${import.meta.env.BASE_URL}backgroundImg.jpg")`;
+
+
+
+const TESTING_MODE = true;
+const TEST_SCENE = 'ibericaFarm5';
+
+if (TESTING_MODE) {
+  farmMenu.style.display = 'none';
+
+  openFarmMenuButton.style.display = 'none';
+
+  resetButton.style.display = 'block';
+
+  activeFarm = farmOptions.find(farm =>
+    farm.locations.some(location => location.scene === TEST_SCENE)
+  );
+
+  loadScene(TEST_SCENE);
+}

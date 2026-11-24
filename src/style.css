@@ -241,35 +241,194 @@ canvas{
   transform: translate(-50%, -130%);
 }
 
-#hotspot-info{
+
+/* HOTSPOT INFORMATION CARD */
+
+#hotspot-info {
   display: none;
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 300px;
-  max-width: 85%;
-  padding: 20px;
-  background: white;
-  border-radius: 12px;
-  z-index: 100;
+
+  width: 420px;
+  max-width: 90%;
+  max-height: 85vh;
+
+  background: #f8faf6;
+  color: #263b2c;
+
+  border-radius: 16px;
+  overflow-y: auto;
+
+  z-index: 200;
+
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55),
+              0 15px 45px rgba(0, 0, 0, 0.25);
+
+  font-family: Arial, sans-serif;
 }
-#hotspot-info button {
-  float: right;
+
+/* HEADER */
+
+.hotspot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 18px 22px;
+
+  background: #214b32;
+  color: white;
+}
+
+.hotspot-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hotspot-label {
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #c5dfc5;
+}
+
+.hotspot-subtitle {
+  font-size: 13px;
+  color: #e1eee1;
+}
+
+.close-hotspot {
+  border: none;
+  background: transparent;
+  color: white;
+
+  font-size: 28px;
   cursor: pointer;
-  font-size: 20px;
+
+  padding: 0 5px;
 }
-#hotspot-thumbnail {
-  width: 100px;
-  height: 75px;
-  object-fit: cover;
-  border-radius: 8px;
+
+.close-hotspot:hover {
+  color: #b9d8b9;
+}
+
+/* MAIN CONTENT */
+
+.hotspot-content {
+  padding: 22px;
+}
+
+#hotspot-title {
+  margin: 0 0 18px;
+
+  font-size: 25px;
+  color: #214b32;
+}
+
+/* IMAGE GALLERY */
+
+.hotspot-gallery {
+  width: 100%;
+}
+
+.hotspot-image-container {
+  width: 100%;
+  height: 230px;
+
+  background: #e7ede5;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 #hotspot-image {
+  display: block;
   width: 100%;
-  max-height: 250px;
-  object-fit: contain;
-  border-radius: 8px;
-  margin-top: 10px;
+  height: 100%;
+
+  object-fit: cover;
+}
+
+/* GALLERY CONTROLS */
+
+.gallery-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+
+  margin-top: 12px;
+}
+
+.gallery-controls span {
+  font-size: 13px;
+  color: #667568;
+  font-weight: bold;
+}
+
+.gallery-button {
+  width: 34px;
+  height: 34px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #e3ebe1;
+  color: #214b32;
+
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gallery-button:hover {
+  background: #214b32;
+  color: white;
+}
+
+/* DESCRIPTION */
+
+.hotspot-description-section {
+  margin-top: 22px;
+  padding-top: 18px;
+
+  border-top: 1px solid #dce5da;
+}
+
+.hotspot-description-section h3 {
+  margin: 0 0 10px;
+
+  font-size: 17px;
+  color: #214b32;
+}
+
+#hotspot-description {
+  margin: 0;
+
+  font-size: 14px;
+  line-height: 1.7;
+  color: #58685b;
+}
+
+/* MOBILE */
+
+@media (max-width: 560px) {
+  #hotspot-info {
+    width: 90%;
+    max-width: 400px;
+    max-height: 85vh;
+  }
+
+  .hotspot-content {
+    padding: 17px;
+  }
+
+  #hotspot-title {
+    font-size: 22px;
+  }
+
+  .hotspot-image-container {
+    height: 190px;
+  }
 }

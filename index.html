@@ -1,20 +1,69 @@
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>farm-tour</title>
+    <title>VR AgriExplore</title>
   </head>
+
   <body>
     <div id="app"></div>
     <div id="arrow-tooltip"></div>
-    <script type="module" src="/src/main.js"></script>
-    <div id="hotspot-info" class="hotspot-info">
-      <button id="close-hotspot">x</button>
-      <h2 id="hotspot-title"></h2>
-      <p id="hotspot-description"></p>
-      <img id="hotspot-image" src="" alt="Hotspot image" />
+
+    
+<div id="hotspot-info" class="hotspot-info">
+
+  <div class="hotspot-header">
+    <div class="hotspot-header-title">
+      <span class="hotspot-label">FARM INFORMATION</span>
+      <span class="hotspot-subtitle">Discover this area</span>
     </div>
+
+    <button id="close-hotspot" class="close-hotspot">
+      &times;
+    </button>
+  </div>
+
+  <div class="hotspot-content">
+
+    <h2 id="hotspot-title">Hotspot Title</h2>
+
+    <div class="hotspot-gallery">
+
+      <div class="hotspot-image-container">
+        <img
+          id="hotspot-image"
+          src=""
+          alt="Hotspot image"
+        />
+      </div>
+
+      <div class="gallery-controls">
+        <button id="previous-image" class="gallery-button">
+          &#10094;
+        </button>
+
+        <span id="image-counter">1 / 1</span>
+
+        <button id="next-image" class="gallery-button">
+          &#10095;
+        </button>
+      </div>
+
+    </div>
+
+    <div class="hotspot-description-section">
+      <h3>About this area</h3>
+      <p id="hotspot-description"></p>
+    </div>
+
+  </div>
+
+</div>
+
+
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
