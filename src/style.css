@@ -172,7 +172,7 @@ canvas{
   font-size: 14px;
 }
 
-.explore-farm-button {
+.farm-card-farm-button {
   margin-top: auto;
   padding: 12px;
   border: none;
@@ -183,7 +183,7 @@ canvas{
   cursor: pointer;
 }
 
-.explore-farm-button:hover {
+.farm-card-button:hover {
   background: #286a38;
 }
 

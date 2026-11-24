@@ -11,18 +11,18 @@ function setInitialCameraView(sceneName) {
 
   if (!location || !location.cameraView) return;
 
-  const yaw = THREE.MathUtils.degToRad(
-    location.cameraView.yaw || 0
+  const horizontal = THREE.MathUtils.degToRad(
+    location.cameraView.horizontal || 0
   );
 
-  const pitch = THREE.MathUtils.degToRad(
-    location.cameraView.pitch || 0
+  const vertical = THREE.MathUtils.degToRad(
+    location.cameraView.vertical || 0
   );
 
   const direction = new THREE.Vector3(
-    Math.sin(yaw) * Math.cos(pitch),
-    Math.sin(pitch),
-    -Math.cos(yaw) * Math.cos(pitch)
+    Math.sin(horizontal) * Math.cos(vertical),
+    Math.sin(vertical),
+    -Math.cos(horizontal) * Math.cos(vertical)
   );
 
   controls.target.copy(direction);
@@ -248,13 +248,13 @@ function createGroundArrows(sceneName) {
 
     const arrow = new THREE.Mesh(geometry, material);
 
-    const yaw = THREE.MathUtils.degToRad(config.yaw || 0);
-    const pitch = THREE.MathUtils.degToRad(config.pitch || 0);
+    const horizontal = THREE.MathUtils.degToRad(config.horizontal || 0);
+    const vertical = THREE.MathUtils.degToRad(config.vertical || 0);
 
     const position = new THREE.Vector3(
-      Math.sin(yaw) * Math.cos(pitch),
-      Math.sin(pitch),
-      -Math.cos(yaw) * Math.cos(pitch)
+      Math.sin(horizontal) * Math.cos(vertical),
+      Math.sin(vertical),
+      -Math.cos(horizontal) * Math.cos(vertical)
     ).multiplyScalar(config.distance || 12);
 
     arrow.position.copy(position);
@@ -532,14 +532,14 @@ function createHotspots(sceneName) {
       hotspot.lookAt(camera.position);
     }
 
-    const yaw = THREE.MathUtils.degToRad(information.yaw || 0);
-    const pitch = THREE.MathUtils.degToRad(information.pitch || 0);
+    const horizontal = THREE.MathUtils.degToRad(information.horizontal || 0);
+    const vertical = THREE.MathUtils.degToRad(information.vertical || 0);
     const distance = information.distance || 12;
 
     hotspot.position.set(
-      Math.sin(yaw) * Math.cos(pitch) * distance,
-      Math.sin(pitch) * distance,
-      -Math.cos(yaw) * Math.cos(pitch) * distance
+      Math.sin(horizontal) * Math.cos(vertical) * distance,
+      Math.sin(vertical) * distance,
+      -Math.cos(horizontal) * Math.cos(vertical) * distance
     );
     hotspot.userData.information = information;
 
@@ -647,11 +647,11 @@ const farmOptions = [
     {
       name: 'Gate',
       scene: 'ibericaFarm1',
-      cameraView:{yaw:-90,pitch:0},
+      cameraView:{horizontal:-90,vertical:0},
       arrows: [
         {
-          yaw: -90,
-          pitch:-20,
+          horizontal: -90,
+          vertical:-20,
           rotation: 0.2,
           distance: 12,
           target: 'ibericaFarm2'
@@ -662,25 +662,25 @@ const farmOptions = [
     {
       name: 'Inside the Farm',
       scene: 'ibericaFarm2',
-      cameraView:{yaw:-90,pitch:0},
+      cameraView:{horizontal:-90,vertical:0},
       arrows: [
         {
-          yaw: -90,
-          pitch:-20,
+          horizontal: -90,
+          vertical:-20,
           rotation: 0,
           distance: 12,
           target: 'ibericaFarm3'
         },
         {
-          yaw:90,
-          pitch:-20,
+          horizontal:90,
+          vertical:-20,
           rotation:-0.5,
           distance: 15,
           target: 'ibericaFarm1'
         },
         {
-          yaw:-30,
-          pitch:-10,
+          horizontal:-30,
+          vertical:-10,
           rotation:1.5,
           distance: 11,
           target: 'ibericaFarmCanopyEggplant'
@@ -691,11 +691,11 @@ const farmOptions = [
     {
       name: 'Right Canopy Eggplant',
       scene: 'ibericaFarmCanopyEggplant',
-      cameraView:{yaw:-90,pitch:0},
+      cameraView:{horizontal:-90,vertical:0},
       arrows: [
         {
-          yaw: 80,
-          pitch:-20,
+          horizontal: 80,
+          vertical:-20,
           rotation: -0.5,
           distance: 12,
           target: 'ibericaFarm3'
@@ -709,21 +709,21 @@ const farmOptions = [
 
       arrows: [
         {
-          yaw:-110,
-          pitch:-15,
+          horizontal:-110,
+          vertical:-15,
           rotation: 0,
           distance: 15,
           target: 'ibericaFarm4'
         },{
-          yaw:70,
-          pitch:-15,
+          horizontal:70,
+          vertical:-15,
           rotation: -0.2,
           distance: 12,
           target: 'ibericaFarm2'
         },
         {
-          yaw:-50,
-          pitch:-10,
+          horizontal:-50,
+          vertical:-10,
           rotation: 1.5,
           distance: 18,
           target: 'ibericaFarm5'
@@ -736,22 +736,22 @@ const farmOptions = [
 
       arrows: [
         {
-          yaw:70,
-          pitch:-5,
+          horizontal:70,
+          vertical:-5,
           rotation: -1.5,
           distance: 18,
           target: 'ibericaFarm5'
         },
         {
-          yaw:100,
-          pitch:-10,
+          horizontal:100,
+          vertical:-10,
           rotation: 0,
           distance: 15,
           target: 'ibericaFarm3'
         },
         {
-          yaw:-90,
-          pitch:-15,
+          horizontal:-90,
+          vertical:-15,
           rotation: -1.2,
           distance: 15,
           target: 'ibericaFarm6'
@@ -764,8 +764,8 @@ const farmOptions = [
 
       arrows: [
         {
-          yaw:85,
-          pitch:-15,
+          horizontal:85,
+          vertical:-15,
           rotation: -0.5,
           distance: 12,
           target: 'ibericaFarm3'
@@ -778,15 +778,15 @@ const farmOptions = [
 
       arrows: [
         {
-          yaw:-85,
-          pitch:-20,
+          horizontal:-85,
+          vertical:-20,
           rotation: 0.5,
           distance: 17,
           target: 'ibericaFarm7'
         },
         {
-          yaw:130,
-          pitch:-20,
+          horizontal:130,
+          vertical:-20,
           rotation: 0.5,
           distance: 17,
           target: 'ibericaFarm4'
@@ -799,8 +799,8 @@ const farmOptions = [
 
       arrows: [
         {
-          yaw:120,
-          pitch:-15,
+          horizontal:120,
+          vertical:-15,
           rotation: 0,
           distance: 15,
           target: 'ibericaFarm6'
@@ -821,11 +821,11 @@ const farmOptions = [
   locations:[
     {name: 'Entrance Gate',
     scene: 'fatimaFarm1',
-    cameraView:{yaw:-90,pitch:0},
+    cameraView:{horizontal:-90,vertical:0},
     arrows: [
       {
-        yaw:-90,
-        pitch:-15,
+        horizontal:-90,
+        vertical:-15,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm2'
@@ -836,15 +836,15 @@ const farmOptions = [
     scene: 'fatimaFarm2',
     arrows: [
       {
-        yaw:-90,
-        pitch:-5,
+        horizontal:-90,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm3'
       },
       {
-        yaw:130,
-        pitch:-5,
+        horizontal:130,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm1'
@@ -855,15 +855,15 @@ const farmOptions = [
     scene: 'fatimaFarm3',
     arrows: [
       {
-        yaw:-100,
-        pitch:-5,
+        horizontal:-100,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm4'
       },
       {
-        yaw:80,
-        pitch:0,
+        horizontal:80,
+        vertical:0,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm2'
@@ -874,15 +874,15 @@ const farmOptions = [
     scene: 'fatimaFarm4',
     arrows: [
       {
-        yaw:-123,
-        pitch:-5,
+        horizontal:-123,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm5'
       },
       {
-        yaw:65,
-        pitch:-2,
+        horizontal:65,
+        vertical:-2,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm3'
@@ -893,15 +893,15 @@ const farmOptions = [
     scene: 'fatimaFarm5',
     arrows: [
       {
-        yaw:-97,
-        pitch:-5,
+        horizontal:-97,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm6'
       },
       {
-        yaw:94,
-        pitch:-2,
+        horizontal:94,
+        vertical:-2,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm4'
@@ -912,15 +912,15 @@ const farmOptions = [
     scene: 'fatimaFarm6',
     arrows: [
       {
-        yaw:-97,
-        pitch:-10,
+        horizontal:-97,
+        vertical:-10,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm7'
       },
       {
-        yaw:83,
-        pitch:-2,
+        horizontal:83,
+        vertical:-2,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm5'
@@ -931,15 +931,15 @@ const farmOptions = [
     scene: 'fatimaFarm7',
     arrows: [
       {
-        yaw:-96,
-        pitch:-5,
+        horizontal:-96,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm8'
       },
       {
-        yaw:65,
-        pitch:-2,
+        horizontal:65,
+        vertical:-2,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm6'
@@ -950,15 +950,15 @@ const farmOptions = [
     scene: 'fatimaFarm8',
     arrows: [
       {
-        yaw:-95,
-        pitch:-5,
+        horizontal:-95,
+        vertical:-5,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm9'
       },
       {
-        yaw:85,
-        pitch:-2,
+        horizontal:85,
+        vertical:-2,
         rotation: 0,
         distance: 12,
         target: 'fatimaFarm7'
@@ -978,27 +978,27 @@ const farmOptions = [
     locations:[
       {name: 'Fundado Cow Farm Entrance',
         scene: 'cowFarmEntrance',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -90,
-          pitch: -15,
+          horizontal: -90,
+          vertical: -15,
           rotation: -0.9,
           distance: 12,
           target: 'cowFarm2'
         }]},
       {name: 'Fundado Cow Farm Path 1',
         scene: 'cowFarm2',
-        cameraView: { yaw: -120, pitch: 0 },
+        cameraView: { horizontal: -120, vertical: 0 },
         arrows: [{
-          yaw: 95,
-          pitch: -15,
+          horizontal: 95,
+          vertical: -15,
           rotation: 0.1,
           distance: 12,
           target: 'cowFarmEntrance'
       },
       {
-        yaw: -120,
-        pitch:-15,
+        horizontal: -120,
+        vertical:-15,
         rotation: -0.8,
         distance: 12,
         target: 'cowFarm4'
@@ -1007,16 +1007,16 @@ const farmOptions = [
       ]},
       {name: 'Fundado Cow Farm Path 2',
         scene: 'cowFarm4',
-        cameraView: { yaw: -80, pitch: 0 },
+        cameraView: { horizontal: -80, vertical: 0 },
         arrows: [{
-          yaw: -80,
-          pitch: -15,
+          horizontal: -80,
+          vertical: -15,
           rotation: 0.6,
           distance: 12,
           target: 'cowFarm5'
         },{
-          yaw: 87,
-          pitch:-40,
+          horizontal: 87,
+          vertical:-40,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm2'
@@ -1024,48 +1024,48 @@ const farmOptions = [
       ]},
       {name: 'Fundado Cow Farm Path 3',
         scene: 'cowFarm5',
-        cameraView: { yaw: -80, pitch: 0 },
+        cameraView: { horizontal: -80, vertical: 0 },
         arrows: [{
-          yaw: -80,
-          pitch:-10,
+          horizontal: -80,
+          vertical:-10,
           rotation: 0.9,
           distance: 16,
           target: 'cowFarm6'
         },{
-          yaw: 87,
-          pitch:-15,
+          horizontal: 87,
+          vertical:-15,
           rotation: -0.5,
           distance: 12,
           target: 'cowFarm4'
         },]},
       {name: 'Fundado Cow Farm Path 4',
         scene: 'cowFarm6',
-        cameraView: { yaw: -70, pitch: 0 },
+        cameraView: { horizontal: -70, vertical: 0 },
         arrows: [{
-          yaw: -70,
-          pitch:-15,
+          horizontal: -70,
+          vertical:-15,
           rotation: 0.5,
           distance: 15,
           target: 'cowFarm7'
         },{
-          yaw: 100,
-          pitch:-15,
+          horizontal: 100,
+          vertical:-15,
           rotation: -0.5,
           distance: 12,
           target: 'cowFarm5'
         },]},
       {name: 'Fundado Cow Farm path 5',
         scene: 'cowFarm7',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw:-90,
-          pitch:-15,
+          horizontal:-90,
+          vertical:-15,
           rotation: 0.40,
           distance: 15,
           target: 'cowFarm8'
         },{
-          yaw: 75,
-          pitch:-15,
+          horizontal: 75,
+          vertical:-15,
           rotation: -0.5,
           distance: 12,
           target: 'cowFarm6'
@@ -1073,16 +1073,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Barrels',
         scene: 'cowFarm8',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw:-92,
-          pitch:-15,
+          horizontal:-92,
+          vertical:-15,
           rotation: 0.25,
           distance: 12,
           target: 'cowFarm9'
         },{
-          yaw: 0,
-          pitch:-15,
+          horizontal: 0,
+          vertical:-15,
           rotation: 2,
           distance: 12,
           target: 'cowFarm7'
@@ -1090,64 +1090,64 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Barrels 2',
         scene: 'cowFarm9',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -96,
-          pitch:-16,
+          horizontal: -96,
+          vertical:-16,
           rotation: 0,
           distance: 12,
           target: 'cowFarm10'
         },{
-          yaw: 87,
-          pitch:-15,
+          horizontal: 87,
+          vertical:-15,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm8'
         },]},
         {name: 'Fundado Cow Farm Barrels 3',
         scene: 'cowFarm10',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -75,
-          pitch:-16,
+          horizontal: -75,
+          vertical:-16,
           rotation: 0.5,
           distance: 12,
           target: 'cowFarm11'
         },{
-          yaw: 105,
-          pitch:-20,
+          horizontal: 105,
+          vertical:-20,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm9'
         },]},
         {name: 'Fundado Cow Farm Barrels 4',
         scene: 'cowFarm11',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -96,
-          pitch:-16,
+          horizontal: -96,
+          vertical:-16,
           rotation: 0,
           distance: 12,
           target: 'cowFarm12'
         },{
-          yaw: 82,
-          pitch:-15,
+          horizontal: 82,
+          vertical:-15,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm10'
         },]},
         {name: 'Fundado Cow Farm Cows',
         scene: 'cowFarm12',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -93,
-          pitch:-16,
+          horizontal: -93,
+          vertical:-16,
           rotation: 0.1,
           distance: 12,
           target: 'cowFarm13'
         },{
-          yaw: 87,
-          pitch:-15,
+          horizontal: 87,
+          vertical:-15,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm11'
@@ -1155,16 +1155,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Cows 2',
         scene: 'cowFarm13',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -90,
-          pitch:-16,
+          horizontal: -90,
+          vertical:-16,
           rotation: 0.150,
           distance: 12,
           target: 'cowFarmMid'
         },{
-          yaw: 90,
-          pitch:-15,
+          horizontal: 90,
+          vertical:-15,
           rotation: -0.1,
           distance: 12,
           target: 'cowFarm12'
@@ -1172,16 +1172,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Cows 3',
         scene: 'cowFarmMid',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -90,
-          pitch:-16,
+          horizontal: -90,
+          vertical:-16,
           rotation: 0.25,
           distance: 12,
           target: 'cowFarm15'
         },{
-          yaw: 93,
-          pitch:-16,
+          horizontal: 93,
+          vertical:-16,
           rotation: -0.2,
           distance: 12,
           target: 'cowFarm13'
@@ -1189,16 +1189,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Cows 4',
         scene: 'cowFarm15',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -18,
-          pitch: -16,
+          horizontal: -18,
+          vertical: -16,
           rotation: 1.5,
           distance: 12,
           target: 'cowFarm16'
         },{
-          yaw: 165,
-          pitch:-16,
+          horizontal: 165,
+          vertical:-16,
           rotation: -0.1,
           distance: 12,
           target: 'cowFarmMid'
@@ -1206,16 +1206,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Cows 5',
         scene: 'cowFarm14',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -90,
-          pitch:-16,
+          horizontal: -90,
+          vertical:-16,
           rotation: 0.25,
           distance: 12,
           target: 'cowFarm15'
         },{
-          yaw: 87,
-          pitch:-16,
+          horizontal: 87,
+          vertical:-16,
           rotation: -0.199,
           distance: 12,
           target: 'cowFarm15'
@@ -1223,16 +1223,16 @@ const farmOptions = [
 
         {name: 'Fundado Cow Farm Exit',
         scene: 'cowFarm16',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: -97,
-          pitch:-16,
+          horizontal: -97,
+          vertical:-16,
           rotation: 0.2,
           distance: 12,
           target: 'cowFarmLast'
         },{
-          yaw: 80,
-          pitch:-16,
+          horizontal: 80,
+          vertical:-16,
           rotation: -0.5,
           distance: 12,
           target: 'cowFarm14'
@@ -1240,10 +1240,10 @@ const farmOptions = [
         
         {name: 'Fundado Cow Farm Outside Pens',
         scene: 'cowFarmLast',
-        cameraView: { yaw: -90, pitch: 0 },
+        cameraView: { horizontal: -90, vertical: 0 },
         arrows: [{
-          yaw: 87,
-          pitch:-16,
+          horizontal: 87,
+          vertical:-16,
           rotation: -0.25,
           distance: 12,
           target: 'cowFarm16'
@@ -1272,8 +1272,8 @@ const farmHotspots = {
   { 
     title: 'Canopy',
     description: 'In the right canopy they planted some eggplant and at the middle of the two structure there are Papaya Trees.',
-    yaw:-45,
-    pitch:-10,
+    horizontal:-45,
+    vertical:-10,
     distance:12,
     size: 0.5,
     thumbnail: `${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`,
