@@ -1251,19 +1251,6 @@ const farmOptions = [
     ]
   },
 
-
-  {name: 'Farm 4',
-    thumbnail: `${import.meta.env.BASE_URL}placeholder4.jpg`,
-    scene: 'farm4',
-    type: 'The products of the farm.',
-    location: 'Address of the farm.',
-    description: 'Description of the farm.',
-    locations:[
-      {name: 'Farm 4 - Location 1', scene: 'farm4'},
-      //{name: 'Farm 4 - Location 2', scene: ''},
-      //{name: 'Farm 4 - Location 3', scene: ''}
-    ]
-  }
 ];
 
 //FarmHotspotData
@@ -1278,15 +1265,7 @@ const farmHotspots = {
     size: 0.5,
     thumbnail: `${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`,
     images: [`${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`]
-  }],
-  farm2:[
-    {
-      title: 'Farm 2 Hotspot',
-      description: 'This is a hotspot for Farm 2.',
-      position: new THREE.Vector3(0, 0, -10),
-      size: 0.5,
-    }
-  ]
+  }]
 };
 
 //loadScene('farm1');
