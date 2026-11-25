@@ -1,6 +1,8 @@
 
 import './style.css';
 import * as THREE from 'three';
+import { VRButton } from
+  'three/addons/webxr/VRButton.js';
 import { OrbitControls } from
   'three/addons/controls/OrbitControls.js';
 
@@ -39,34 +41,143 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 0, 0.1);
 
+const gazeReticle = new THREE.Group();
+
+const dot = new THREE.Mesh(
+  new THREE.CircleGeometry(0.006, 24),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    depthTest: false
+  })
+);
+
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(0.015, 0.020, 32),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false
+  })
+);
+
+gazeReticle.add(dot);
+gazeReticle.add(ring);
+
+gazeReticle.position.set(0, 0, -1);
+
+camera.add(gazeReticle);
+
+gazeReticle.visible = false;
+
+function updateGazeNavigation() {
+
+  if (!renderer.xr.isPresenting) {
+    gazeReticle.visible = false;
+
+    gazeTarget = null;
+    gazeStartTime = 0;
+
+    return;
+  }
+
+  gazeReticle.visible = true;
+
+  if (gazeNavigating) return;
+
+  const xrCamera = renderer.xr.getCamera(camera);
+
+  xrCamera.getWorldPosition(gazeOrigin);
+  xrCamera.getWorldDirection(gazeDirection);
+
+  gazeRaycaster.set(gazeOrigin, gazeDirection);
+
+  const intersections = gazeRaycaster.intersectObjects(
+    arrowGroup.children,
+    true
+  );
+
+  const hit = intersections.find(
+    intersection => intersection.object.userData.target
+  );
+
+  if (!hit) {
+    gazeTarget = null;
+    gazeStartTime = 0;
+
+    ring.material.color.set(0xffffff);
+    ring.scale.setScalar(1);
+
+    return;
+  }
+
+  const target = hit.object.userData.target;
+
+  if (gazeTarget !== target) {
+    gazeTarget = target;
+    gazeStartTime = performance.now();
+  }
+
+  const elapsedTime = performance.now() - gazeStartTime;
+
+  const progress = Math.min(
+    elapsedTime / GAZE_DURATION,
+    1
+  );
+
+  ring.scale.setScalar(1 + progress * 0.4);
+
+  if (progress >= 1) {
+
+    gazeNavigating = true;
+
+    const nextScene = target;
+
+    loadScene(nextScene).finally(() => {
+
+      gazeNavigating = false;
+      gazeTarget = null;
+      gazeStartTime = 0;
+
+      ring.scale.setScalar(1);
+      ring.material.color.set(0xffffff);
+
+    });
+  }
+}
+
 const renderer = new THREE.WebGLRenderer({
   antialias: true
 });
+
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.xr.enabled = true;
+
 document.body.appendChild(renderer.domElement);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(
+  VRButton.createButton(renderer)
+);
 
 const geometry = new THREE.SphereGeometry(500, 60, 40);
 geometry.scale(-1, 1, 1);
 
 const loader = new THREE.TextureLoader();
 
-// Store loaded panorama textures
 const textureCache = new Map();
 const texturePromises = new Map();
 
 function getPanoramaTexture(path) {
-  // Already loaded
+  
   if (textureCache.has(path)) {
     return Promise.resolve(textureCache.get(path));
   }
 
-  // Currently loading
+  
   if (texturePromises.has(path)) {
     return texturePromises.get(path);
   }
-
-  // Load for the first time
+ 
   const promise = new Promise((resolve, reject) => {
     loader.load(
       path,
@@ -438,7 +549,6 @@ function makeCircularTexture(imagePath) {
   const context = canvas.getContext('2d');
   const texture = new THREE.CanvasTexture(canvas);
 
-  // Draw a visible fallback while the thumbnail loads.
   context.fillStyle = '#ff3333';
   context.beginPath();
   context.arc(128, 128, 120, 0, Math.PI * 2);
@@ -626,12 +736,17 @@ window.addEventListener('resize', () => {
 });
 
 function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
+
+  if (!renderer.xr.isPresenting) {
+    controls.update();
+  }
+
   renderer.render(scene, camera);
+
+  updateGazeNavigation();
 }
 
-animate();
+renderer.setAnimationLoop(animate);
 
 // FarmDataArrows
 const farmOptions = [
