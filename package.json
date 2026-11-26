@@ -12,6 +12,7 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "vite-plugin-mkcert": "^2.1.0"
   }
 }

@@ -43,26 +43,55 @@ camera.position.set(0, 0, 0.1);
 
 const gazeReticle = new THREE.Group();
 
-const dot = new THREE.Mesh(
-  new THREE.CircleGeometry(0.006, 24),
-  new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    depthTest: false
-  })
+const dot = new THREE.Group();
+dot.add(
+  new THREE.Mesh(
+    new THREE.CircleGeometry(0.006, 24, 0, Math.PI),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: false,
+      depthWrite: false
+    })
+  ),
+  new THREE.Mesh(
+    new THREE.CircleGeometry(0.006, 24, Math.PI, Math.PI),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      depthTest: false,
+      depthWrite: false
+    })
+  )
 );
 
-const ring = new THREE.Mesh(
-  new THREE.RingGeometry(0.015, 0.020, 32),
+const ring = new THREE.Group();
+const ringTop = new THREE.Mesh(
+  new THREE.RingGeometry(0.015, 0.020, 32, 1, 0, Math.PI),
   new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
     opacity: 0.9,
-    depthTest: false
+    depthTest: false,
+    depthWrite: false
+  })
+);
+const ringBottom = new THREE.Mesh(
+  new THREE.RingGeometry(0.015, 0.020, 32, 1, Math.PI, Math.PI),
+  new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false,
+    depthWrite: false
   })
 );
 
+ring.add(ringTop, ringBottom);
+ring.renderOrder = 1000;
+dot.renderOrder = 1000;
+
 gazeReticle.add(dot);
 gazeReticle.add(ring);
+gazeReticle.renderOrder = 1000;
 
 // Tooltip canvas
 const tooltipCanvas = document.createElement('canvas');
@@ -85,6 +114,7 @@ const tooltipSprite = new THREE.Sprite(
 // Position the tooltip below the reticle
 tooltipSprite.scale.set(0.42, 0.079, 1);
 tooltipSprite.position.set(0, -0.10, 0.01);
+tooltipSprite.renderOrder = 1001;
 
 gazeReticle.add(tooltipSprite);
 tooltipSprite.visible = false;
@@ -103,12 +133,16 @@ function setGazeTooltip(message) {
     tooltipCanvas.height
   );
 
-  tooltipContext.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  tooltipContext.fillStyle = 'rgba(246, 250, 242, 0.96)';
   tooltipContext.beginPath();
   tooltipContext.roundRect(4, 4, 504, 88, 20);
   tooltipContext.fill();
 
-  tooltipContext.fillStyle = 'white';
+  tooltipContext.strokeStyle = 'rgba(31, 65, 41, 0.7)';
+  tooltipContext.lineWidth = 3;
+  tooltipContext.stroke();
+
+  tooltipContext.fillStyle = '#111a12';
   tooltipContext.font = 'bold 28px Arial';
   tooltipContext.textAlign = 'center';
   tooltipContext.textBaseline = 'middle';
@@ -128,8 +162,6 @@ camera.add(gazeReticle);
 scene.add(camera);
 
 gazeReticle.visible = false;
-
-scene.add(camera);
 
 // Gaze information HUD
 const gazeCanvas = document.createElement('canvas');
@@ -157,11 +189,21 @@ const gazeRaycaster = new THREE.Raycaster();
 const gazeOrigin = new THREE.Vector3();
 const gazeDirection = new THREE.Vector3();
 
-const GAZE_DURATION = 4000;
+const GAZE_DURATION = 2000;
+const HOTSPOT_GAZE_DURATION = 2000;
 
+let gazeHotspot = null;
+let gazeHotspotStartTime = 0;
+let gazeHotspotOpening = false;
 let gazeTarget = null;
 let gazeStartTime = 0;
+let gazeDwellConsumed = false;
 let gazeNavigating = false;
+const gazeDirectionAtPanelClose = new THREE.Vector3();
+let gazeMustMoveAfterPanelClose = false;
+const gazeMenuInitialDirection = new THREE.Vector3();
+let gazeMenuDirectionInitialized = false;
+let gazeMenuSelectionArmed = false;
 
 function updateGazeHUD(sceneName, countdown) {
   gazeContext.clearRect(0, 0, 512, 128);
@@ -186,104 +228,340 @@ function updateGazeHUD(sceneName, countdown) {
   gazeTexture.needsUpdate = true;
 }
 
+function resetGazeDwell() {
+  gazeTarget = null;
+  gazeStartTime = 0;
+  gazeDwellConsumed = false;
+  tooltipSprite.visible = false;
+  ring.scale.setScalar(1);
+  ringTop.material.color.set(0xffffff);
+}
+
+function updateGazeDwell(
+  target,
+  label,
+  activate,
+  duration = HOTSPOT_GAZE_DURATION
+) {
+  if (gazeTarget !== target) {
+    gazeTarget = target;
+    gazeStartTime = performance.now();
+    gazeDwellConsumed = false;
+  }
+
+  if (gazeDwellConsumed) {
+    tooltipSprite.visible = false;
+    return;
+  }
+
+  const elapsed = performance.now() - gazeStartTime;
+  const progress = Math.min(elapsed / duration, 1);
+  const remaining = Math.max(
+    0,
+    Math.ceil((duration - elapsed) / 1000)
+  );
+
+  ring.scale.setScalar(1 + progress * 0.5);
+  ringTop.material.color.set(0x00ff88);
+  tooltipSprite.visible = true;
+  setGazeTooltip(`${label} in ${remaining}...`);
+
+  if (progress >= 1) {
+    gazeDwellConsumed = true;
+    tooltipSprite.visible = false;
+    ring.scale.setScalar(1);
+    ringTop.material.color.set(0xffffff);
+    activate();
+  }
+}
+
 
 function updateGazeNavigation() {
-
   if (!renderer.xr.isPresenting) {
     gazeReticle.visible = false;
-    gazeHud.visible = false;
+    dot.visible = true;
+    ring.visible = true;
+    tooltipSprite.visible = false;
 
     gazeTarget = null;
     gazeStartTime = 0;
+    gazeDwellConsumed = false;
+    gazeMustMoveAfterPanelClose = false;
+    gazeMenuDirectionInitialized = false;
+    gazeMenuSelectionArmed = false;
 
     return;
   }
 
   gazeReticle.visible = true;
+  dot.visible = true;
+  ring.visible = true;
 
-  if (gazeNavigating) return;
+  if (gazeNavigating) {
+    tooltipSprite.visible = false;
+    return;
+  }
 
   const xrCamera = renderer.xr.getCamera(camera);
 
+  xrCamera.updateMatrixWorld(true);
+  if (vrMenuNeedsPlacement) {
+    placeVRFarmMenu(xrCamera);
+  }
+  if (vrBackToFarmsNeedsPlacement) {
+    placeVRBackToFarmsButton(xrCamera);
+  }
+
+  gazeRaycaster.camera = xrCamera;
   xrCamera.getWorldPosition(gazeOrigin);
   xrCamera.getWorldDirection(gazeDirection);
-
   gazeRaycaster.set(gazeOrigin, gazeDirection);
 
-  const intersections = gazeRaycaster.intersectObjects(
-    arrowGroup.children,
+  if (gazeMustMoveAfterPanelClose) {
+    const movedEnough = gazeDirection.angleTo(
+      gazeDirectionAtPanelClose
+    ) >= THREE.MathUtils.degToRad(8);
+
+    if (!movedEnough) {
+      resetGazeDwell();
+      tooltipSprite.visible = true;
+      setGazeTooltip('Look away to continue');
+      return;
+    }
+
+    gazeMustMoveAfterPanelClose = false;
+  }
+
+  if (vrHotspotPanel.visible) {
+    vrHotspotPanel.updateMatrixWorld(true);
+    const panelHit = gazeRaycaster
+      .intersectObjects(vrHotspotPanel.children, true)
+      .find(hit =>
+        hit.object.visible && hit.object.userData.vrAction
+      );
+
+    if (!panelHit) {
+      resetGazeDwell();
+      return;
+    }
+
+    const action = panelHit.object.userData.vrAction;
+    const labels = {
+      close: 'Close information',
+      previous: vrPanelView === 'showcase'
+        ? 'Previous product'
+        : 'Previous image',
+      next: vrPanelView === 'showcase'
+        ? 'Next product'
+        : 'Next image',
+      'previous-showcase-image': 'Previous product image',
+      'next-showcase-image': 'Next product image',
+      showcase: vrPanelView === 'showcase'
+        ? 'Return to hotspot info'
+        : 'Open agricultural showcase'
+    };
+
+    updateGazeDwell(
+      panelHit.object,
+      labels[action] || 'Use button',
+      () => activateVRPanelAction(action)
+    );
+    return;
+  }
+
+  if (vrMenuGroup.visible) {
+    if (vrMenuOpen) {
+      if (!gazeMenuDirectionInitialized) {
+        gazeMenuInitialDirection.copy(gazeDirection);
+        gazeMenuDirectionInitialized = true;
+      }
+
+      const movedFromMenuOpen = gazeDirection.angleTo(
+        gazeMenuInitialDirection
+      ) >= THREE.MathUtils.degToRad(12);
+
+      if (!gazeMenuSelectionArmed && movedFromMenuOpen) {
+        gazeMenuSelectionArmed = true;
+      }
+
+      if (!gazeMenuSelectionArmed) {
+        resetGazeDwell();
+        tooltipSprite.visible = true;
+        setGazeTooltip('Look around to choose a farm');
+        return;
+      }
+    }
+
+    vrMenuGroup.updateMatrixWorld(true);
+    const menuHit = gazeRaycaster
+      .intersectObjects(vrMenuGroup.children, true)
+      .find(hit => hit.object.userData.action);
+
+    if (menuHit) {
+      const { action, farmIndex } = menuHit.object.userData;
+      const farm = farmOptions[farmIndex];
+      const label = action === 'select-farm'
+        ? `Select ${farm?.name || 'farm'}`
+        : 'Open farm menu';
+
+      updateGazeDwell(
+        menuHit.object,
+        label,
+        () => handleVRMenuSelection(menuHit.object),
+        HOTSPOT_GAZE_DURATION
+      );
+      return;
+    }
+
+    if (vrMenuOpen) {
+      resetGazeDwell();
+      return;
+    }
+  }
+
+  if (vrBackToFarmsGroup.visible) {
+    vrBackToFarmsGroup.updateMatrixWorld(true);
+    const backHit = gazeRaycaster
+      .intersectObjects(vrBackToFarmsGroup.children, true)
+      .find(hit => hit.object.userData.action);
+
+    if (backHit) {
+      updateGazeDwell(
+        backHit.object,
+        'Going back to farm selection',
+        () => handleVRMenuSelection(backHit.object)
+      );
+      return;
+    }
+  }
+
+  // 1. Check hotspots first.
+  hotspotGroup.updateMatrixWorld(true);
+  const hotspotHits = gazeRaycaster.intersectObjects(
+    hotspotGroup.children,
     true
   );
 
-  const hit = intersections.find(
-    intersection => intersection.object.userData.target
+  const hotspotHit = hotspotHits.find(
+    hit => hit.object.userData.information
   );
 
-  // Hide the scene name and countdown when not looking at a marker.
-  if (!hit) {
-    gazeTarget = null;
-    gazeStartTime = 0;
+  if (hotspotHit) {
+    const target = hotspotHit.object;
+    const information = target.userData.information;
 
-    gazeHud.visible = false;
+    if (gazeTarget !== target) {
+      gazeTarget = target;
+      gazeStartTime = performance.now();
+    }
 
-    ring.material.color.set(0xffffff);
-    ring.scale.setScalar(1);
+    const elapsed = performance.now() - gazeStartTime;
+
+    const progress = Math.min(
+      elapsed / HOTSPOT_GAZE_DURATION,
+      1
+    );
+
+    const remaining = Math.max(
+      0,
+      Math.ceil(
+        (HOTSPOT_GAZE_DURATION - elapsed) / 1000
+      )
+    );
+
+    ring.scale.setScalar(1 + progress * 0.5);
+    ringTop.material.color.set(0x00ff88);
+
+    tooltipSprite.visible = true;
+
+    setGazeTooltip(
+      `Opening ${information.title} in ${remaining}...`
+    );
+
+    if (progress >= 1) {
+      openVRHotspot(target);
+
+      gazeTarget = null;
+      gazeStartTime = 0;
+
+      tooltipSprite.visible = false;
+
+      ring.scale.setScalar(1);
+      ringTop.material.color.set(0xffffff);
+    }
 
     return;
   }
 
-  const target = hit.object.userData.target;
+  // 2. Check navigation arrows.
+  const arrowHits = gazeRaycaster.intersectObjects(
+    arrowGroup.children,
+    true
+  );
 
-  // Start countdown when looking at a new marker.
+  const arrowHit = arrowHits.find(
+    hit => hit.object.userData.target
+  );
+
+  if (!arrowHit) {
+    resetGazeDwell();
+    return;
+  }
+
+  const arrow = arrowHit.object;
+  const target = arrow.userData.target;
+
   if (gazeTarget !== target) {
     gazeTarget = target;
     gazeStartTime = performance.now();
   }
 
-  const elapsedTime = performance.now() - gazeStartTime;
+  const elapsed = performance.now() - gazeStartTime;
 
   const progress = Math.min(
-    elapsedTime / GAZE_DURATION,
+    elapsed / GAZE_DURATION,
     1
   );
 
   const remaining = Math.max(
-    1,
-    Math.ceil((GAZE_DURATION - elapsedTime) / 1000)
+    0,
+    Math.ceil((GAZE_DURATION - elapsed) / 1000)
   );
 
-  // Get the destination's display name.
-  const targetLocation = activeFarm?.locations.find(
-    loc => loc.scene === target
+  const destination = activeFarm?.locations.find(
+    location => location.scene === target
   );
 
-  const sceneName = targetLocation?.name || target;
+  const destinationName = destination
+    ? destination.name
+    : target;
 
-  // Display the scene name and countdown.
-  gazeHud.visible = true;
-  updateGazeHUD(sceneName, remaining);
-
-  // Grow the reticle ring as the countdown progresses.
   ring.scale.setScalar(1 + progress * 0.4);
+  ringTop.material.color.set(0xffffff);
 
-  // Navigate after 4 seconds.
+  tooltipSprite.visible = true;
+
+  setGazeTooltip(
+    `Going to ${destinationName} in ${remaining}...`
+  );
+
   if (progress >= 1) {
-
     gazeNavigating = true;
-    gazeHud.visible = false;
+
+    tooltipSprite.visible = false;
 
     loadScene(target).finally(() => {
-
       gazeNavigating = false;
       gazeTarget = null;
       gazeStartTime = 0;
 
       ring.scale.setScalar(1);
-      ring.material.color.set(0xffffff);
-
+      ringTop.material.color.set(0xffffff);
     });
   }
 }
+
+
 
 
 const renderer = new THREE.WebGLRenderer({
@@ -292,6 +570,7 @@ const renderer = new THREE.WebGLRenderer({
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local');
 
 renderer.xr.addEventListener('sessionstart', () => {
   console.log('VR mode started');
@@ -321,7 +600,7 @@ document.body.appendChild(
   VRButton.createButton(renderer)
 );
 
-const geometry = new THREE.SphereGeometry(500, 60, 40);
+const geometry = new THREE.SphereGeometry(500, 48, 32);
 geometry.scale(-1, 1, 1);
 
 const loader = new THREE.TextureLoader();
@@ -329,60 +608,84 @@ const loader = new THREE.TextureLoader();
 const textureCache = new Map();
 const texturePromises = new Map();
 
+const MAX_CACHED_PANORAMAS = 3;
 
+let currentPanoramaPath = null;
 
-function getPanoramaTexture(path) {
-  
+function trimTextureCache() {
+  while (textureCache.size > MAX_CACHED_PANORAMAS) {
+
+    const oldestPath = [...textureCache.keys()].find(
+      path => path !== currentPanoramaPath
+    );
+
+    if (!oldestPath) break;
+
+    const oldTexture = textureCache.get(oldestPath);
+
+    oldTexture.dispose();
+    textureCache.delete(oldestPath);
+  }
+}
+
+async function getPanoramaTexture(path) {
+
   if (textureCache.has(path)) {
-    return Promise.resolve(textureCache.get(path));
+    const texture = textureCache.get(path);
+
+    textureCache.delete(path);
+    textureCache.set(path, texture);
+
+    return texture;
   }
 
-  
   if (texturePromises.has(path)) {
     return texturePromises.get(path);
   }
- 
+
   const promise = new Promise((resolve, reject) => {
     loader.load(
       path,
-      (texture) => {
+      texture => {
         textureCache.set(path, texture);
-        texturePromises.delete(path);
         resolve(texture);
       },
       undefined,
-      (error) => {
-        texturePromises.delete(path);
-        reject(error);
-      }
+      reject
     );
   });
 
   texturePromises.set(path, promise);
-  return promise;
+
+  try {
+    return await promise;
+  } finally {
+    texturePromises.delete(path);
+    trimTextureCache();
+  }
 }
 
-function preloadFarmImages(farm, currentSceneName) {
-  if (!farm || !farm.locations) return;
-
-  farm.locations.forEach((location) => {
-    // Skip the panorama currently being displayed
-    if (location.scene === currentSceneName) return;
-
-    const imagePath = scenes[location.scene];
-
-    if (imagePath) {
-      getPanoramaTexture(imagePath).catch((error) => {
-        console.error('Preload failed:', imagePath, error);
-      });
-    }
-  });
-}
 
 let activeFarm = null;
 
 const arrowGroup = new THREE.Group();
 scene.add(arrowGroup);
+
+const vrMenuGroup = new THREE.Group();
+
+vrMenuGroup.position.set(0, 0, -2.5);
+vrMenuGroup.visible = false;
+
+camera.add(vrMenuGroup);
+
+const vrBackToFarmsGroup = new THREE.Group();
+vrBackToFarmsGroup.visible = false;
+scene.add(vrBackToFarmsGroup);
+
+let vrMenuOpen = false;
+let vrMenuNeedsPlacement = false;
+let vrBackToFarmsNeedsPlacement = false;
+
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -443,7 +746,6 @@ const scenes = {
 let currentScene = 'farm1';
 
 let sceneLoadRequest = 0;
-
 async function loadScene(sceneName) {
   const imagePath = scenes[sceneName];
 
@@ -453,23 +755,20 @@ async function loadScene(sceneName) {
   }
 
   const requestId = ++sceneLoadRequest;
+  closeVRHotspot();
 
-  // Clear old navigation arrows and hotspots immediately.
   arrowGroup.clear();
   hotspotGroup.clear();
 
-  // Close the information panel when changing locations.
   hotspotInfo.style.display = 'none';
 
   try {
     const texture = await getPanoramaTexture(imagePath);
 
-    // Ignore an older request if another scene was selected.
-    if (requestId !== sceneLoadRequest) return;
-
-    const material = new THREE.MeshBasicMaterial({
-      map: texture
-    });
+    // Ignore outdated loading requests.
+    if (requestId !== sceneLoadRequest) {
+      return;
+    }
 
     const oldSphere = scene.getObjectByName('panorama');
 
@@ -478,9 +777,16 @@ async function loadScene(sceneName) {
       oldSphere.material.dispose();
     }
 
+    const material = new THREE.MeshBasicMaterial({
+      map: texture
+    });
+
     const sphere = new THREE.Mesh(geometry, material);
     sphere.name = 'panorama';
+
     scene.add(sphere);
+
+    currentPanoramaPath = imagePath;
 
     currentScene = sceneName;
 
@@ -488,6 +794,15 @@ async function loadScene(sceneName) {
 
     createGroundArrows(sceneName);
     createHotspots(sceneName);
+
+    if (
+      renderer.xr.isPresenting &&
+      vrBackToFarmsGroup.children.length > 0
+    ) {
+      vrBackToFarmsNeedsPlacement = true;
+    }
+
+    trimTextureCache();
 
   } catch (error) {
     console.error('Error loading texture:', imagePath, error);
@@ -524,13 +839,14 @@ function createGroundArrows(sceneName) {
     const arrow = new THREE.Mesh(geometry, material);
 
     const horizontal = THREE.MathUtils.degToRad(config.horizontal || 0);
-    const vertical = THREE.MathUtils.degToRad(config.vertical || 0);
+    const distance = config.distance || 12;
+    arrow.scale.setScalar(distance / 12);
 
     const position = new THREE.Vector3(
-      Math.sin(horizontal) * Math.cos(vertical),
-      Math.sin(vertical),
-      -Math.cos(horizontal) * Math.cos(vertical)
-    ).multiplyScalar(config.distance || 12);
+      Math.sin(horizontal),
+      0,
+      -Math.cos(horizontal)
+    ).multiplyScalar(distance);
 
     arrow.position.copy(position);
 
@@ -673,9 +989,187 @@ const hotspotImage = document.getElementById('hotspot-image');
 const previousImage = document.getElementById('previous-image');
 const nextImage = document.getElementById('next-image');
 const imageCounter = document.getElementById('image-counter');
+const hotspotAreaTab = document.getElementById('hotspot-area-tab');
+const hotspotShowcaseTab = document.getElementById('hotspot-showcase-tab');
+const hotspotAreaView = document.getElementById('hotspot-area-view');
+const hotspotShowcaseView = document.getElementById('hotspot-showcase-view');
+const showcaseImage = document.getElementById('showcase-image');
+const showcaseImagePlaceholder = document.getElementById(
+  'showcase-image-placeholder'
+);
+const previousShowcaseImage = document.getElementById(
+  'previous-showcase-image'
+);
+const nextShowcaseImage = document.getElementById(
+  'next-showcase-image'
+);
+const showcaseImageCounter = document.getElementById(
+  'showcase-image-counter'
+);
+const showcaseProductControls = document.getElementById(
+  'showcase-product-controls'
+);
+const showcaseProductCounter = document.getElementById(
+  'showcase-product-counter'
+);
+const showcaseProductTitle = document.getElementById(
+  'showcase-product-title'
+);
+const showcaseProductDescription = document.getElementById(
+  'showcase-product-description'
+);
+const showcaseProductProduction = document.getElementById(
+  'showcase-product-production'
+);
+const previousShowcaseProduct = document.getElementById(
+  'previous-showcase-product'
+);
+const nextShowcaseProduct = document.getElementById(
+  'next-showcase-product'
+);
 
 let currentImages = [];
 let currentImageIndex = 0;
+let currentShowcaseProducts = [];
+let currentShowcaseProductIndex = 0;
+let currentShowcaseImageIndex = 0;
+let showcaseImageRequest = 0;
+
+function getShowcaseProductImages(product) {
+  if (Array.isArray(product?.images)) {
+    return product.images.filter(Boolean);
+  }
+
+  return product?.image ? [product.image] : [];
+}
+
+function setDesktopHotspotView(view) {
+  const isShowcase = view === 'showcase';
+
+  hotspotAreaView.hidden = isShowcase;
+  hotspotShowcaseView.hidden = !isShowcase;
+  hotspotAreaTab.classList.toggle('is-active', !isShowcase);
+  hotspotShowcaseTab.classList.toggle('is-active', isShowcase);
+  hotspotAreaTab.setAttribute('aria-selected', String(!isShowcase));
+  hotspotShowcaseTab.setAttribute('aria-selected', String(isShowcase));
+
+  if (isShowcase) {
+    showDesktopShowcaseProduct();
+  }
+}
+
+function showDesktopShowcaseProduct() {
+  const product = currentShowcaseProducts[currentShowcaseProductIndex];
+  const images = getShowcaseProductImages(product);
+  const requestId = ++showcaseImageRequest;
+
+  showcaseProductControls.hidden =
+    currentShowcaseProducts.length <= 1;
+  previousShowcaseImage.hidden = images.length <= 1;
+  nextShowcaseImage.hidden = images.length <= 1;
+  showcaseImageCounter.hidden = images.length <= 1;
+  showcaseImage.hidden = true;
+  showcaseImage.removeAttribute('src');
+  showcaseImagePlaceholder.hidden = false;
+
+  if (!product) {
+    showcaseProductTitle.textContent = 'Featured farm products';
+    showcaseProductDescription.textContent =
+      'The platform will provide information about products produced by the featured farm, including basic descriptions and how they are produced.';
+    showcaseProductProduction.textContent =
+      'Add product details and production information to this hotspot showcase.';
+    showcaseImagePlaceholder.textContent = 'Product image will appear here.';
+    showcaseProductCounter.textContent = '';
+    showcaseImageCounter.textContent = '';
+    return;
+  }
+
+  showcaseProductTitle.textContent = product.title || 'Featured product';
+  showcaseProductDescription.textContent =
+    product.description || 'Product description will appear here.';
+  showcaseProductProduction.textContent =
+    product.production || 'Production information will appear here.';
+  showcaseProductCounter.textContent =
+    `${currentShowcaseProductIndex + 1} / ${currentShowcaseProducts.length}`;
+
+  if (images.length === 0) {
+    showcaseImagePlaceholder.textContent = 'Product image will appear here.';
+    showcaseImageCounter.textContent = '';
+    return;
+  }
+
+  const imagePath = images[currentShowcaseImageIndex] || images[0];
+  showcaseImageCounter.textContent =
+    `${currentShowcaseImageIndex + 1} / ${images.length}`;
+  showcaseImagePlaceholder.textContent = 'Loading product image...';
+  showcaseImage.alt = `${product.title || 'Featured product'} image`;
+  showcaseImage.onload = () => {
+    if (requestId !== showcaseImageRequest) return;
+
+    showcaseImage.hidden = false;
+    showcaseImagePlaceholder.hidden = true;
+  };
+  showcaseImage.onerror = () => {
+    if (requestId !== showcaseImageRequest) return;
+
+    console.error(
+      'Could not load desktop showcase image:',
+      imagePath
+    );
+    showcaseImagePlaceholder.textContent =
+      'Product image could not be loaded.';
+  };
+  showcaseImage.src = imagePath;
+}
+
+function changeDesktopShowcaseImage(direction) {
+  const images = getShowcaseProductImages(
+    currentShowcaseProducts[currentShowcaseProductIndex]
+  );
+  if (images.length <= 1) return;
+
+  currentShowcaseImageIndex =
+    (currentShowcaseImageIndex + direction + images.length) %
+    images.length;
+
+  showDesktopShowcaseProduct();
+}
+
+function changeDesktopShowcaseProduct(direction) {
+  if (currentShowcaseProducts.length <= 1) return;
+
+  currentShowcaseProductIndex =
+    (currentShowcaseProductIndex + direction +
+      currentShowcaseProducts.length) %
+    currentShowcaseProducts.length;
+  currentShowcaseImageIndex = 0;
+
+  showDesktopShowcaseProduct();
+}
+
+hotspotAreaTab.addEventListener('click', () => {
+  setDesktopHotspotView('area');
+});
+
+hotspotShowcaseTab.addEventListener('click', () => {
+  setDesktopHotspotView('showcase');
+});
+
+previousShowcaseProduct.addEventListener('click', () => {
+  changeDesktopShowcaseProduct(-1);
+});
+
+nextShowcaseProduct.addEventListener('click', () => {
+  changeDesktopShowcaseProduct(1);
+});
+
+previousShowcaseImage.addEventListener('click', () => {
+  changeDesktopShowcaseImage(-1);
+});
+
+nextShowcaseImage.addEventListener('click', () => {
+  changeDesktopShowcaseImage(1);
+});
 
 function showHotspotImage() {
   if (currentImages.length === 0) return;
@@ -821,38 +1315,63 @@ function createHotspots(sceneName) {
   });
 }
 
+function openHotspotInformation(information) {
+  if (!information) return;
+
+  hotspotTitle.textContent = information.title;
+  hotspotDescription.textContent = information.description;
+  currentShowcaseProducts = Array.isArray(information.showcase)
+    ? information.showcase
+    : [];
+  currentShowcaseProductIndex = 0;
+  currentShowcaseImageIndex = 0;
+  setDesktopHotspotView('area');
+
+  currentImages = information.images || [];
+  currentImageIndex = 0;
+
+  if (currentImages.length > 0) {
+    showHotspotImage();
+    hotspotImage.style.display = 'block';
+  } else {
+    hotspotImage.style.display = 'none';
+  }
+
+  hotspotInfo.style.display = 'block';
+}
+
 renderer.domElement.addEventListener('pointerup', (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
 
-  hotspotMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  hotspotMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  hotspotMouse.x =
+    ((event.clientX - rect.left) / rect.width) * 2 - 1;
+
+  hotspotMouse.y =
+    -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   hotspotRaycaster.setFromCamera(hotspotMouse, camera);
 
-  const hits = hotspotRaycaster.intersectObjects(hotspotGroup.children);
+  const hits = hotspotRaycaster.intersectObjects(
+    hotspotGroup.children,
+    true
+  );
 
   if (hits.length > 0) {
     const information = hits[0].object.userData.information;
-
-    hotspotTitle.textContent = information.title;
-    hotspotDescription.textContent = information.description;
-
-    currentImages = information.images || [];
-    currentImageIndex = 0;
-
-    if (currentImages.length > 0) {
-      showHotspotImage();
-      hotspotImage.style.display = 'block';
-    } else {
-      hotspotImage.style.display = 'none';
-    }
-
-    hotspotInfo.style.display = 'block';
+    openHotspotInformation(information);
   }
 });
 
 closeHotspotButton.addEventListener('click', () => {
   hotspotInfo.style.display = 'none';
+  showcaseImageRequest++;
+  setDesktopHotspotView('area');
+
+  gazeHotspotOpening = false;
+  gazeHotspot = null;
+  gazeHotspotStartTime = 0;
+
+  gazeHud.visible = false;
 });
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -900,14 +1419,15 @@ window.addEventListener('resize', () => {
 });
 
 function animate() {
-
   if (!renderer.xr.isPresenting) {
     controls.update();
   }
 
-  renderer.render(scene, camera);
-
   updateGazeNavigation();
+  updateVRControllerHaptics();
+  updateVRProductionScroll();
+
+  renderer.render(scene, camera);
 }
 
 renderer.setAnimationLoop(animate);
@@ -918,9 +1438,9 @@ const farmOptions = [
   name: 'Iberica Farm',
   thumbnail: `${import.meta.env.BASE_URL}iberica/OUTSIDE GATE.jpg`,
   scene: 'ibericaFarm1',
-  type: 'The products of the farm.',
-  location: 'Address of the farm.',
-  description: 'Description of the farm.',
+  type: 'A farm that is owned by the municipality of Labo which helps grow and test seedlings.',
+  location: 'Iberica, Labo Camrines Norte.',
+  description: 'This farm provides the Farmers of Labo with healthy seedlings.',
 
   locations: [
     {
@@ -930,7 +1450,7 @@ const farmOptions = [
       arrows: [
         {
           horizontal: -90,
-          vertical:-20,
+          vertical:0,
           rotation: 0.2,
           distance: 12,
           target: 'ibericaFarm2'
@@ -945,7 +1465,7 @@ const farmOptions = [
       arrows: [
         {
           horizontal: -90,
-          vertical:-20,
+          vertical:0,
           rotation: 0,
           distance: 12,
           target: 'ibericaFarm3'
@@ -959,7 +1479,7 @@ const farmOptions = [
         },
         {
           horizontal:-30,
-          vertical:-10,
+          vertical:0,
           rotation:1.5,
           distance: 11,
           target: 'ibericaFarmCanopyEggplant'
@@ -1090,12 +1610,12 @@ const farmOptions = [
 },
 
 
-  {name: 'Fatima Farm Gate',
+  {name: 'Fatima Farm Resort',
     thumbnail: `${import.meta.env.BASE_URL}fatima/GATE 1.jpg`,
     scene: 'fatimaFarm1',
     type: 'This a Farm and a Resort.',
-    location: 'Address of the farm.',
-    description: 'This farm has Dragon fruits, Chickens and other amenities just like a regular resort it has a swimming pool.',
+    location: 'Santa Cruz, Labo Camarines Norte.',
+    description: 'A family run farm resort that has various amenities.',
 
   locations:[
     {name: 'Entrance Gate',
@@ -1251,9 +1771,9 @@ const farmOptions = [
   {name: 'Fundado Cow Farm',
     thumbnail: `${import.meta.env.BASE_URL}fundado/1.jpg`,
     scene: 'cowFarmEntrance',
-    type: 'The products of the farm.',
-    location: 'Address of the farm.',
-    description: 'Description of the farm.',
+    type: 'Private Cattle and Dairy Farm.',
+    location: 'Labo, Camarines Norte.',
+    description: 'This Farm provides Meat and dairy to Labo.',
     locations:[
       {name: 'Fundado Cow Farm Entrance',
         scene: 'cowFarmEntrance',
@@ -1532,6 +2052,489 @@ const farmOptions = [
 
 ];
 
+
+// =====================================
+// VR FARM MENU
+// =====================================
+
+function createVRButtonTexture(text, background = '#286a38') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 160;
+
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = background;
+  ctx.beginPath();
+  ctx.roundRect(8, 8, 496, 144, 24);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 42px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 80);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  return texture;
+}
+
+function createVRMenuBackdropTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 768;
+
+  const ctx = canvas.getContext('2d');
+  const background = ctx.createLinearGradient(0, 0, 0, 768);
+  background.addColorStop(0, 'rgba(20, 54, 37, 0.97)');
+  background.addColorStop(1, 'rgba(8, 25, 18, 0.97)');
+
+  ctx.fillStyle = background;
+  ctx.beginPath();
+  ctx.roundRect(10, 10, 1004, 748, 42);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(190, 220, 166, 0.58)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createVRMenuHeaderTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 180;
+
+  const ctx = canvas.getContext('2d');
+  const background = ctx.createLinearGradient(0, 0, 1024, 0);
+  background.addColorStop(0, '#2f7444');
+  background.addColorStop(1, '#1b5134');
+
+  ctx.fillStyle = background;
+  ctx.beginPath();
+  ctx.roundRect(10, 10, 1004, 160, 28);
+  ctx.fill();
+
+  ctx.fillStyle = '#d7edbd';
+  ctx.font = 'bold 22px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('VR AGRIEXPLORE  /  CAMARINES NORTE', 42, 55);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 42px Arial';
+  ctx.fillText('Choose a farm to explore', 42, 116);
+
+  ctx.fillStyle = '#e2f1d8';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${farmOptions.length} FARM TOURS`, 975, 116);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createVRMenuHintTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 100;
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#d6e8c8';
+  ctx.font = 'bold 26px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(
+    'MOVE GAZE TO CHOOSE  •  HOLD 2 SECONDS OR PRESS TRIGGER',
+    512,
+    50
+  );
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createVRFarmCard(farm, index) {
+  const group = new THREE.Group();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 720;
+
+  const ctx = canvas.getContext('2d');
+
+  function drawCard(image = null) {
+    ctx.clearRect(0, 0, 512, 720);
+    ctx.fillStyle = '#f6f8f2';
+    ctx.beginPath();
+    ctx.roundRect(5, 5, 502, 710, 28);
+    ctx.fill();
+
+    ctx.strokeStyle = '#dbe6d6';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    if (image) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(16, 16, 480, 260, 22);
+      ctx.clip();
+      ctx.drawImage(image, 16, 16, 480, 260);
+
+      const shade = ctx.createLinearGradient(0, 150, 0, 276);
+      shade.addColorStop(0, 'rgba(9, 25, 17, 0)');
+      shade.addColorStop(1, 'rgba(9, 25, 17, 0.72)');
+      ctx.fillStyle = shade;
+      ctx.fillRect(16, 150, 480, 126);
+      ctx.restore();
+    } else {
+      const fallback = ctx.createLinearGradient(0, 16, 0, 276);
+      fallback.addColorStop(0, '#b8d2ac');
+      fallback.addColorStop(1, '#527d56');
+      ctx.fillStyle = fallback;
+      ctx.beginPath();
+      ctx.roundRect(16, 16, 480, 260, 22);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(8, 27, 18, 0.78)';
+    ctx.beginPath();
+    ctx.roundRect(32, 34, 142, 42, 21);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 19px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`FARM ${String(index + 1).padStart(2, '0')}`, 103, 55);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#1e3525';
+    ctx.font = 'bold 34px Arial';
+    ctx.fillText(farm.name, 32, 330, 448);
+
+    ctx.fillStyle = '#43804b';
+    ctx.font = 'bold 17px Arial';
+    ctx.fillText('LOCATION', 32, 370);
+
+    ctx.fillStyle = '#526458';
+    ctx.font = '22px Arial';
+    ctx.fillText(farm.location || 'Camarines Norte', 32, 401, 448);
+
+    const description = farm.description || farm.type || '';
+    const words = description.split(/\s+/);
+    const lines = [];
+    let line = '';
+
+    words.forEach(word => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width > 448 && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    });
+
+    if (line) lines.push(line);
+
+    ctx.fillStyle = '#657467';
+    ctx.font = '21px Arial';
+    lines.slice(0, 2).forEach((text, lineIndex) => {
+      ctx.fillText(text, 32, 445 + lineIndex * 31, 448);
+    });
+
+    ctx.fillStyle = '#337747';
+    ctx.beginPath();
+    ctx.roundRect(28, 574, 456, 92, 20);
+    ctx.fill();
+
+    ctx.fillStyle = '#2c693d';
+    ctx.beginPath();
+    ctx.arc(438, 620, 23, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 30px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EXPLORE FARM', 240, 620);
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(430, 620);
+    ctx.lineTo(446, 620);
+    ctx.lineTo(439, 612);
+    ctx.moveTo(446, 620);
+    ctx.lineTo(439, 628);
+    ctx.stroke();
+  }
+
+  drawCard();
+
+  const cardTexture = new THREE.CanvasTexture(canvas);
+  cardTexture.colorSpace = THREE.SRGBColorSpace;
+
+  // Load farm thumbnail
+  const image = new Image();
+
+  image.onload = () => {
+    drawCard(image);
+    cardTexture.needsUpdate = true;
+  };
+
+  image.onerror = () => {
+    console.error('Could not load VR farm thumbnail:', farm.thumbnail);
+  };
+
+  image.src = farm.thumbnail;
+
+  const card = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.80, 1.125),
+    new THREE.MeshBasicMaterial({
+      map: cardTexture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthTest: false
+    })
+  );
+
+  card.renderOrder = 10;
+  card.userData.action = 'select-farm';
+  card.userData.farmIndex = index;
+
+  group.add(card);
+
+  return group;
+}
+
+function placeVRFarmMenu(viewerCamera) {
+  const viewerPosition = new THREE.Vector3();
+  const viewerQuaternion = new THREE.Quaternion();
+  const forward = new THREE.Vector3(0, 0, -1);
+
+  viewerCamera.getWorldPosition(viewerPosition);
+  viewerCamera.getWorldQuaternion(viewerQuaternion);
+  forward.applyQuaternion(viewerQuaternion);
+
+  scene.add(vrMenuGroup);
+  vrMenuGroup.position
+    .copy(viewerPosition)
+    .addScaledVector(forward, 2.5);
+  vrMenuGroup.quaternion.copy(viewerQuaternion);
+  vrMenuGroup.visible = true;
+  vrMenuNeedsPlacement = false;
+}
+
+function placeVRBackToFarmsButton(viewerCamera) {
+  const viewerPosition = new THREE.Vector3();
+  const viewerQuaternion = new THREE.Quaternion();
+  const offset = new THREE.Vector3(-0.70, 0.72, -2.5);
+
+  viewerCamera.getWorldPosition(viewerPosition);
+  viewerCamera.getWorldQuaternion(viewerQuaternion);
+  offset.applyQuaternion(viewerQuaternion);
+
+  vrBackToFarmsGroup.position.copy(viewerPosition).add(offset);
+  vrBackToFarmsGroup.quaternion.copy(viewerQuaternion);
+  vrBackToFarmsGroup.visible = true;
+  vrBackToFarmsNeedsPlacement = false;
+}
+
+function openVRFarmMenu() {
+  vrMenuGroup.clear();
+
+  vrMenuOpen = true;
+  vrMenuNeedsPlacement = renderer.xr.isPresenting;
+  vrBackToFarmsGroup.visible = false;
+  vrBackToFarmsNeedsPlacement = false;
+  gazeMenuDirectionInitialized = false;
+  gazeMenuSelectionArmed = false;
+
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.2, 2.42),
+    new THREE.MeshBasicMaterial({
+      map: createVRMenuBackdropTexture(),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+  backdrop.position.set(0, 0.02, -0.08);
+  backdrop.renderOrder = 1;
+  vrMenuGroup.add(backdrop);
+
+  const header = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.9, 0.51),
+    new THREE.MeshBasicMaterial({
+      map: createVRMenuHeaderTexture(),
+      transparent: true,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+
+  header.position.set(0, 0.84, 0.02);
+  header.renderOrder = 5;
+  vrMenuGroup.add(header);
+
+  farmOptions.forEach((farm, index) => {
+    const card = createVRFarmCard(farm, index);
+
+    card.position.set(
+      (index - (farmOptions.length - 1) / 2) * 0.94,
+      -0.04,
+      0.03
+    );
+
+    vrMenuGroup.add(card);
+  });
+
+  const hint = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.35, 0.20),
+    new THREE.MeshBasicMaterial({
+      map: createVRMenuHintTexture(),
+      transparent: true,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+
+  hint.position.set(0, -0.87, 0.02);
+  hint.renderOrder = 5;
+  vrMenuGroup.add(hint);
+
+  if (vrMenuNeedsPlacement) {
+    scene.add(vrMenuGroup);
+    vrMenuGroup.visible = false;
+  } else {
+    camera.add(vrMenuGroup);
+    vrMenuGroup.position.set(0, 0, -2.5);
+    vrMenuGroup.quaternion.identity();
+    vrMenuGroup.visible = true;
+  }
+}
+
+function closeVRFarmMenu() {
+  vrMenuOpen = false;
+  vrMenuNeedsPlacement = false;
+  vrMenuGroup.visible = false;
+  gazeMenuDirectionInitialized = false;
+  gazeMenuSelectionArmed = false;
+}
+
+function createVRSelectFarmButton() {
+  vrMenuGroup.clear();
+  camera.add(vrMenuGroup);
+  vrMenuGroup.position.set(0, 0, -2.5);
+  vrMenuGroup.quaternion.identity();
+
+  const selectFarmButton = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.72, 0.22),
+    new THREE.MeshBasicMaterial({
+      map: createVRButtonTexture('SELECT FARM'),
+      transparent: true,
+      side: THREE.DoubleSide
+    })
+  );
+  selectFarmButton.position.set(0.70, -0.72, 0);
+  vrMenuGroup.add(selectFarmButton);
+
+  const selectFarmHitbox = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.92, 0.36),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+  selectFarmHitbox.position.set(0.70, -0.72, 0.04);
+  selectFarmHitbox.userData.action = 'open-farm-menu';
+  vrMenuGroup.add(selectFarmHitbox);
+
+  vrMenuGroup.visible = true;
+
+  vrMenuOpen = false;
+
+  vrBackToFarmsGroup.clear();
+
+  const backButton = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.72, 0.22),
+    new THREE.MeshBasicMaterial({
+      map: createVRButtonTexture('BACK TO FARMS'),
+      transparent: true,
+      side: THREE.DoubleSide
+    })
+  );
+  backButton.position.set(0, 0, 0);
+  vrBackToFarmsGroup.add(backButton);
+
+  const backHitbox = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.92, 0.36),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+  backHitbox.position.set(0, 0, 0.04);
+  backHitbox.userData.action = 'open-farm-menu';
+  vrBackToFarmsGroup.add(backHitbox);
+
+  vrBackToFarmsNeedsPlacement = renderer.xr.isPresenting;
+  vrBackToFarmsGroup.visible = renderer.xr.isPresenting;
+}
+
+// Select a farm from the VR menu
+function selectVRFarm(index) {
+  const selectedFarm = farmOptions[index];
+
+  if (!selectedFarm) return;
+
+  console.log('VR selected farm:', selectedFarm.name);
+
+  activeFarm = selectedFarm;
+
+  closeVRFarmMenu();
+  createVRSelectFarmButton();
+
+  farmMenu.classList.add('is-hidden');
+  openFarmMenuButton.style.display = 'block';
+  resetButton.style.display = 'block';
+
+  loadScene(selectedFarm.scene);
+}
+
+// Handle VR menu button selection
+function handleVRMenuSelection(object) {
+  const action = object.userData.action;
+
+  if (action === 'select-farm') {
+    selectVRFarm(object.userData.farmIndex);
+    return true;
+  }
+
+  if (action === 'open-farm-menu') {
+    openVRFarmMenu();
+    return true;
+  }
+
+  return false;
+}
+
+
 //FarmHotspotData
 const farmHotspots = {
   ibericaFarm2:[
@@ -1543,11 +2546,1131 @@ const farmHotspots = {
     distance:12,
     size: 0.5,
     thumbnail: `${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`,
-    images: [`${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`]
+    images: [`${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`],
+    // Add products with title, images array, description, and production details.
+    showcase: [{title: 'This is an eggplant plant.',
+              images:[`${import.meta.env.BASE_URL}product/iberica/Eggplant.jpg`],
+              description:'This is one of the produce that this farm helps test and give to other farmers.',
+              production:'Eggplants grow well in a location that gets full sun—at least 6 to 8 hours of direct sunlight per day.\n Eggplants grow best in a well-draining sandy loam or loam soil that is fairly high in organic matter.'
+    }]
   }]
 };
 
-//loadScene('farm1');
+
+// ======================================
+// VR HOTSPOT INFORMATION PANEL
+// ======================================
+
+const vrHotspotPanel = new THREE.Group();
+vrHotspotPanel.visible = false;
+scene.add(vrHotspotPanel);
+
+// Panel canvas
+const vrPanelCanvas = document.createElement('canvas');
+vrPanelCanvas.width = 1024;
+vrPanelCanvas.height = 700;
+
+const vrPanelContext = vrPanelCanvas.getContext('2d');
+
+const vrPanelTexture = new THREE.CanvasTexture(vrPanelCanvas);
+
+const vrPanelMaterial = new THREE.MeshBasicMaterial({
+  map: vrPanelTexture,
+  side: THREE.DoubleSide,
+  depthTest: false,
+  transparent: false
+});
+
+const vrPanelMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.8, 1.9),
+  vrPanelMaterial
+);
+
+vrPanelMesh.renderOrder = 50;
+vrHotspotPanel.add(vrPanelMesh);
+
+let vrPanelInformation = null;
+let vrPanelImages = [];
+let vrPanelImageIndex = 0;
+let vrPanelImage = null;
+let vrPanelView = 'information';
+let vrShowcaseProducts = [];
+let vrShowcaseProductIndex = 0;
+let vrShowcaseImageIndex = 0;
+let vrShowcaseImage = null;
+let vrShowcaseImageError = false;
+let vrProductionScrollOffset = 0;
+let vrProductionScrollDirection = 1;
+let vrProductionScrollMaxOffset = 0;
+let vrProductionScrollLastUpdate = 0;
+let vrProductionScrollPauseUntil = 0;
+let vrMenuVisibleBeforeHotspot = false;
+let vrBackToFarmsVisibleBeforeHotspot = false;
+
+let vrPanelImageRequest = 0;
+let vrShowcaseImageRequest = 0;
+const vrPanelButtons = {};
+
+// Create invisible controller-selectable buttons
+function createVRPanelButton(action, x, y, width, height) {
+  const button = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+
+  button.position.set(x, y, 0.04);
+  button.userData.vrAction = action;
+
+  vrHotspotPanel.add(button);
+  return button;
+}
+
+vrPanelButtons.close = createVRPanelButton(
+  'close', 1.22, 0.77, 0.40, 0.35
+);
+vrPanelButtons.previous = createVRPanelButton(
+  'previous', -0.85, -0.80, 0.65, 0.25
+);
+vrPanelButtons.showcase = createVRPanelButton(
+  'showcase', 0, -0.84, 0.75, 0.14
+);
+vrPanelButtons.previousShowcaseImage = createVRPanelButton(
+  'previous-showcase-image', -1.16, 0.27, 0.30, 0.30
+);
+vrPanelButtons.nextShowcaseImage = createVRPanelButton(
+  'next-showcase-image', 1.16, 0.27, 0.30, 0.30
+);
+vrPanelButtons.next = createVRPanelButton(
+  'next', 0.85, -0.80, 0.65, 0.25
+);
+
+function getVRShowcaseTextLines(ctx, text, maxWidth) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  let line = '';
+  const lines = [];
+
+  words.forEach(word => {
+    const candidate = line ? `${line} ${word}` : word;
+
+    if (line && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  });
+
+  if (line) lines.push(line);
+
+  return lines;
+}
+
+function drawVRShowcaseText(
+  ctx,
+  text,
+  x,
+  y,
+  maxWidth,
+  lineHeight,
+  maxLines
+) {
+  getVRShowcaseTextLines(ctx, text, maxWidth)
+    .slice(0, maxLines)
+    .forEach((line, index) => {
+      ctx.fillText(line, x, y + index * lineHeight, maxWidth);
+    });
+}
+
+// Draw the panel
+function drawVRHotspotPanel() {
+  const ctx = vrPanelContext;
+
+  ctx.clearRect(0, 0, 1024, 700);
+
+  // Background
+  ctx.fillStyle = '#17251e';
+  ctx.fillRect(0, 0, 1024, 700);
+
+  if (!vrPanelInformation) return;
+
+  const showingShowcase = vrPanelView === 'showcase';
+  const showcaseProduct = vrShowcaseProducts[vrShowcaseProductIndex];
+  const showcaseProductImages = getShowcaseProductImages(
+    showcaseProduct
+  );
+  const hasShowcaseNavigation = vrShowcaseProducts.length > 1;
+  vrPanelButtons.previous.visible =
+    !showingShowcase || hasShowcaseNavigation;
+  vrPanelButtons.next.visible =
+    !showingShowcase || hasShowcaseNavigation;
+  vrPanelButtons.previousShowcaseImage.visible =
+    showingShowcase && showcaseProductImages.length > 1;
+  vrPanelButtons.nextShowcaseImage.visible =
+    showingShowcase && showcaseProductImages.length > 1;
+
+  // Title
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 48px Arial';
+  ctx.fillText(
+    showingShowcase
+      ? 'AGRICULTURAL SHOWCASE'
+      : vrPanelInformation.title || 'Hotspot',
+    55,
+    85,
+    850
+  );
+
+  // Close button
+  ctx.fillStyle = '#ff5555';
+  ctx.fillRect(925, 35, 65, 65);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 42px Arial';
+  ctx.fillText('X', 943, 82);
+
+  if (showingShowcase) {
+    ctx.fillStyle = '#263b30';
+    ctx.fillRect(55, 125, 914, 250);
+
+    if (vrShowcaseImage) {
+      const scale = Math.min(
+        880 / vrShowcaseImage.width,
+        225 / vrShowcaseImage.height
+      );
+      const width = vrShowcaseImage.width * scale;
+      const height = vrShowcaseImage.height * scale;
+
+      ctx.drawImage(
+        vrShowcaseImage,
+        512 - width / 2,
+        250 - height / 2,
+        width,
+        height
+      );
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        showcaseProductImages.length > 0
+          ? vrShowcaseImageError
+            ? 'Product image could not be loaded'
+            : 'Loading product image...'
+          : 'Product image will appear here',
+        512,
+        255
+      );
+      ctx.textAlign = 'left';
+    }
+
+    if (showcaseProductImages.length > 1) {
+      [[90, 'left'], [934, 'right']].forEach(([x, direction]) => {
+        ctx.fillStyle = 'rgba(23, 37, 30, 0.85)';
+        ctx.beginPath();
+        ctx.arc(x, 250, 38, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        if (direction === 'left') {
+          ctx.moveTo(x + 8, 232);
+          ctx.lineTo(x - 8, 250);
+          ctx.lineTo(x + 8, 268);
+        } else {
+          ctx.moveTo(x - 8, 232);
+          ctx.lineTo(x + 8, 250);
+          ctx.lineTo(x - 8, 268);
+        }
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(462, 345, 100, 28);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${vrShowcaseImageIndex + 1} / ${showcaseProductImages.length}`,
+        512,
+        366
+      );
+      ctx.textAlign = 'left';
+    }
+
+    if (showcaseProduct) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 27px Arial';
+      ctx.fillText(
+        showcaseProduct.title || 'Featured product',
+        55,
+        415,
+        900
+      );
+
+      ctx.fillStyle = '#a9d5a7';
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText('DESCRIPTION', 55, 452);
+
+      ctx.fillStyle = '#eeeeee';
+      ctx.font = '21px Arial';
+      drawVRShowcaseText(
+        ctx,
+        showcaseProduct.description || 'Product description will appear here.',
+        55,
+        480,
+        900,
+        25,
+        2
+      );
+
+      ctx.fillStyle = '#22382c';
+      ctx.beginPath();
+      ctx.roundRect(55, 527, 914, 88, 14);
+      ctx.fill();
+      ctx.strokeStyle = '#a9d5a7';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#a9d5a7';
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText('HOW IT IS PRODUCED', 75, 554);
+
+      ctx.fillStyle = '#eeeeee';
+      ctx.font = '21px Arial';
+      const productionLines = getVRShowcaseTextLines(
+        ctx,
+        showcaseProduct.production ||
+          'Production information will appear here.',
+        870
+      );
+      const productionLineHeight = 22;
+      const productionTextHeight = 44;
+      vrProductionScrollMaxOffset = Math.max(
+        0,
+        productionLines.length * productionLineHeight -
+          productionTextHeight
+      );
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(65, 565, 894, productionTextHeight);
+      ctx.clip();
+
+      productionLines.forEach((line, index) => {
+        ctx.fillText(
+          line,
+          75,
+          583 + index * productionLineHeight -
+            vrProductionScrollOffset,
+          870
+        );
+      });
+
+      ctx.restore();
+    } else {
+      vrProductionScrollMaxOffset = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 26px Arial';
+      ctx.fillText('Featured farm products', 55, 415);
+
+      ctx.fillStyle = '#eeeeee';
+      ctx.font = '22px Arial';
+      drawVRShowcaseText(
+        ctx,
+        'The platform will provide information about products produced by the featured farm, including basic descriptions and how they are produced.',
+        55,
+        460,
+        900,
+        29,
+        3
+      );
+
+      ctx.fillStyle = '#a9d5a7';
+      ctx.font = '20px Arial';
+      ctx.fillText(
+        'Add product details and an image to this hotspot showcase.',
+        55,
+        565,
+        900
+      );
+    }
+
+    ctx.fillStyle = '#39865a';
+    ctx.fillRect(375, 635, 274, 50);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 23px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOTSPOT INFO', 512, 670);
+    ctx.textAlign = 'left';
+
+    if (hasShowcaseNavigation) {
+      ctx.fillStyle = '#39865a';
+      ctx.fillRect(55, 635, 260, 50);
+      ctx.fillRect(709, 635, 260, 50);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 25px Arial';
+      ctx.fillText('PREVIOUS', 105, 670);
+      ctx.fillText('NEXT', 800, 670);
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${vrShowcaseProductIndex + 1} / ${vrShowcaseProducts.length}`,
+        512,
+        620
+      );
+      ctx.textAlign = 'left';
+    }
+
+    vrPanelTexture.needsUpdate = true;
+    return;
+  }
+
+  // Description
+  ctx.fillStyle = '#eeeeee';
+  ctx.font = '28px Arial';
+
+  const description =
+    vrPanelInformation.description || '';
+
+  const words = description.split(' ');
+  const lines = [];
+  let line = '';
+
+  words.forEach(word => {
+    const testLine = line + word + ' ';
+
+    if (ctx.measureText(testLine).width > 900) {
+      lines.push(line);
+      line = word + ' ';
+    } else {
+      line = testLine;
+    }
+  });
+
+  if (line) lines.push(line);
+
+  lines.slice(0, 4).forEach((text, index) => {
+    ctx.fillText(text, 55, 155 + index * 40);
+  });
+
+  ctx.fillStyle = '#a9d5a7';
+  ctx.font = '20px Arial';
+  ctx.fillText(
+    'Look at a button and hold your gaze to activate',
+    55,
+    310,
+    900
+  );
+
+  // Image area
+  ctx.fillStyle = '#263b30';
+  ctx.fillRect(55, 335, 914, 275);
+
+  if (vrPanelImage) {
+    const image = vrPanelImage;
+
+    const scale = Math.min(
+      880 / image.width,
+      245 / image.height
+    );
+
+    const width = image.width * scale;
+    const height = image.height * scale;
+
+    ctx.drawImage(
+      image,
+      512 - width / 2,
+      472 - height / 2,
+      width,
+      height
+    );
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '28px Arial';
+    ctx.fillText(
+      vrPanelImages.length
+        ? 'Loading image...'
+        : 'No images available',
+      370,
+      480
+    );
+  }
+
+  // Image navigation buttons
+  ctx.fillStyle = '#39865a';
+  ctx.fillRect(55, 635, 260, 50);
+  ctx.fillRect(375, 635, 274, 50);
+  ctx.fillRect(709, 635, 260, 50);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 25px Arial';
+
+  ctx.fillText('PREVIOUS', 105, 670);
+  ctx.textAlign = 'center';
+  ctx.fillText('SHOWCASE', 512, 670);
+  ctx.textAlign = 'left';
+  ctx.fillText('NEXT', 800, 670);
+
+  // Image counter
+  if (vrPanelImages.length > 0) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(452, 575, 120, 38);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(
+      `${vrPanelImageIndex + 1} / ${vrPanelImages.length}`,
+      512,
+      601
+    );
+    ctx.textAlign = 'left';
+  }
+
+  vrPanelTexture.needsUpdate = true;
+}
+
+function updateVRProductionScroll() {
+  if (
+    !vrHotspotPanel.visible ||
+    vrPanelView !== 'showcase' ||
+    vrProductionScrollMaxOffset <= 0
+  ) {
+    vrProductionScrollLastUpdate = 0;
+    return;
+  }
+
+  const now = performance.now();
+  if (!vrProductionScrollLastUpdate) {
+    vrProductionScrollLastUpdate = now;
+    return;
+  }
+
+  const elapsed = Math.min(now - vrProductionScrollLastUpdate, 50);
+  vrProductionScrollLastUpdate = now;
+
+  if (now < vrProductionScrollPauseUntil) return;
+
+  vrProductionScrollOffset +=
+    vrProductionScrollDirection * elapsed * 0.02;
+
+  if (vrProductionScrollOffset >= vrProductionScrollMaxOffset) {
+    vrProductionScrollOffset = vrProductionScrollMaxOffset;
+    vrProductionScrollDirection = -1;
+    vrProductionScrollPauseUntil = now + 800;
+  } else if (vrProductionScrollOffset <= 0) {
+    vrProductionScrollOffset = 0;
+    vrProductionScrollDirection = 1;
+    vrProductionScrollPauseUntil = now + 800;
+  }
+
+  drawVRHotspotPanel();
+}
+
+// Load the selected image
+
+function loadVRPanelImage() {
+  const requestId = ++vrPanelImageRequest;
+
+  vrPanelImage = null;
+
+  if (vrPanelImages.length === 0) {
+    drawVRHotspotPanel();
+    return;
+  }
+
+  const image = new Image();
+
+  const imagePath = vrPanelImages[vrPanelImageIndex];
+
+  image.onload = () => {
+    if (
+      requestId !== vrPanelImageRequest ||
+      !vrHotspotPanel.visible
+    ) {
+      return;
+    }
+
+    vrPanelImage = image;
+
+    drawVRHotspotPanel();
+  };
+
+  image.onerror = () => {
+    if (requestId !== vrPanelImageRequest) return;
+
+    console.error(
+      'Could not load VR hotspot image:',
+      imagePath
+    );
+
+    drawVRHotspotPanel();
+  };
+
+  image.src = imagePath;
+}
+
+function loadVRShowcaseImage() {
+  const requestId = ++vrShowcaseImageRequest;
+  const product = vrShowcaseProducts[vrShowcaseProductIndex];
+  const images = getShowcaseProductImages(product);
+  const imagePath = images[vrShowcaseImageIndex] || images[0];
+  vrShowcaseImage = null;
+  vrShowcaseImageError = false;
+  vrProductionScrollOffset = 0;
+  vrProductionScrollDirection = 1;
+  vrProductionScrollLastUpdate = 0;
+  vrProductionScrollPauseUntil = 0;
+
+  if (!imagePath) {
+    drawVRHotspotPanel();
+    return;
+  }
+
+  drawVRHotspotPanel();
+
+  const image = new Image();
+
+  image.onload = () => {
+    if (
+      requestId !== vrShowcaseImageRequest ||
+      !vrHotspotPanel.visible ||
+      vrPanelView !== 'showcase'
+    ) {
+      return;
+    }
+
+    vrShowcaseImage = image;
+    drawVRHotspotPanel();
+  };
+
+  image.onerror = () => {
+    if (requestId !== vrShowcaseImageRequest) return;
+
+    console.error(
+      'Could not load agricultural showcase image:',
+      imagePath
+    );
+
+    vrShowcaseImageError = true;
+    drawVRHotspotPanel();
+  };
+
+  image.src = imagePath;
+}
+
+
+function openVRHotspot(hotspot) {
+  const information = hotspot.userData.information;
+
+  if (!information) return;
+
+  const xrCamera = renderer.xr.getCamera(camera);
+  const viewerPosition = new THREE.Vector3();
+  const viewerQuaternion = new THREE.Quaternion();
+  const forward = new THREE.Vector3(0, 0, -1);
+
+  xrCamera.updateMatrixWorld(true);
+  xrCamera.getWorldPosition(viewerPosition);
+  xrCamera.getWorldQuaternion(viewerQuaternion);
+  forward.applyQuaternion(viewerQuaternion);
+
+  vrHotspotPanel.position
+    .copy(viewerPosition)
+    .addScaledVector(forward, 2.5);
+  vrHotspotPanel.quaternion.copy(viewerQuaternion);
+
+  vrPanelInformation = information;
+
+  vrPanelImages = information.images || (
+    information.thumbnail
+      ? [information.thumbnail]
+      : []
+  );
+  vrShowcaseProducts = Array.isArray(information.showcase)
+    ? information.showcase
+    : [];
+
+  vrPanelImageIndex = 0;
+  vrPanelImage = null;
+  vrPanelView = 'information';
+  vrShowcaseProductIndex = 0;
+  vrShowcaseImageIndex = 0;
+  vrShowcaseImage = null;
+  vrShowcaseImageError = false;
+  vrProductionScrollOffset = 0;
+  vrProductionScrollDirection = 1;
+  vrProductionScrollMaxOffset = 0;
+  vrProductionScrollLastUpdate = 0;
+  vrProductionScrollPauseUntil = 0;
+
+  vrMenuVisibleBeforeHotspot = vrMenuGroup.visible;
+  vrBackToFarmsVisibleBeforeHotspot = vrBackToFarmsGroup.visible;
+  vrMenuGroup.visible = false;
+  vrBackToFarmsGroup.visible = false;
+  vrBackToFarmsNeedsPlacement = false;
+  vrHotspotPanel.visible = true;
+  arrowGroup.visible = false;
+  hotspotGroup.visible = false;
+
+  gazeTarget = null;
+  gazeStartTime = 0;
+
+  tooltipSprite.visible = false;
+
+  ring.scale.setScalar(1);
+  ringTop.material.color.set(0xffffff);
+
+  drawVRHotspotPanel();
+  loadVRPanelImage();
+}
+
+
+
+// Close the VR information panel
+function closeVRHotspot() {
+  const panelWasOpen = vrHotspotPanel.visible;
+  if (panelWasOpen && renderer.xr.isPresenting) {
+    gazeDirectionAtPanelClose.copy(gazeDirection);
+    gazeMustMoveAfterPanelClose = true;
+  }
+
+  vrHotspotPanel.visible = false;
+  if (panelWasOpen) {
+    vrMenuGroup.visible = vrMenuVisibleBeforeHotspot;
+    vrBackToFarmsGroup.visible =
+      vrBackToFarmsVisibleBeforeHotspot;
+  }
+  vrMenuVisibleBeforeHotspot = false;
+  vrBackToFarmsVisibleBeforeHotspot = false;
+  arrowGroup.visible = true;
+  hotspotGroup.visible = true;
+
+  vrPanelInformation = null;
+  vrPanelImages = [];
+  vrPanelImage = null;
+  vrPanelImageIndex = 0;
+  vrPanelView = 'information';
+  vrShowcaseProducts = [];
+  vrShowcaseProductIndex = 0;
+  vrShowcaseImageIndex = 0;
+  vrShowcaseImage = null;
+  vrShowcaseImageError = false;
+
+  vrPanelImageRequest++;
+  vrShowcaseImageRequest++;
+
+  gazeTarget = null;
+  gazeStartTime = 0;
+
+  tooltipSprite.visible = false;
+
+  ring.scale.setScalar(1);
+  ringTop.material.color.set(0xffffff);
+}
+
+// Change images
+function changeVRHotspotImage(direction) {
+  if (vrPanelImages.length <= 1) return;
+
+  vrPanelImageIndex =
+    (vrPanelImageIndex + direction + vrPanelImages.length) %
+    vrPanelImages.length;
+
+  loadVRPanelImage();
+}
+
+function changeVRShowcaseProduct(direction) {
+  if (vrShowcaseProducts.length <= 1) return;
+
+  vrShowcaseProductIndex =
+    (vrShowcaseProductIndex + direction + vrShowcaseProducts.length) %
+    vrShowcaseProducts.length;
+  vrShowcaseImageIndex = 0;
+
+  loadVRShowcaseImage();
+}
+
+function changeVRShowcaseImage(direction) {
+  const images = getShowcaseProductImages(
+    vrShowcaseProducts[vrShowcaseProductIndex]
+  );
+  if (images.length <= 1) return;
+
+  vrShowcaseImageIndex =
+    (vrShowcaseImageIndex + direction + images.length) % images.length;
+
+  loadVRShowcaseImage();
+}
+
+function activateVRPanelAction(action) {
+  if (action === 'close') {
+    closeVRHotspot();
+  } else if (action === 'previous-showcase-image') {
+    changeVRShowcaseImage(-1);
+  } else if (action === 'next-showcase-image') {
+    changeVRShowcaseImage(1);
+  } else if (action === 'previous') {
+    if (vrPanelView === 'showcase') {
+      changeVRShowcaseProduct(-1);
+    } else {
+      changeVRHotspotImage(-1);
+    }
+  } else if (action === 'next') {
+    if (vrPanelView === 'showcase') {
+      changeVRShowcaseProduct(1);
+    } else {
+      changeVRHotspotImage(1);
+    }
+  } else if (action === 'showcase') {
+    if (vrPanelView === 'showcase') {
+      vrPanelView = 'information';
+      vrShowcaseImageRequest++;
+      vrShowcaseImage = null;
+      loadVRPanelImage();
+    } else {
+      vrPanelView = 'showcase';
+      vrShowcaseProductIndex = 0;
+      vrShowcaseImageIndex = 0;
+      loadVRShowcaseImage();
+    }
+  }
+}
+
+// ======================================
+// VR CONTROLLER SYSTEM
+// ======================================
+
+const vrControllerRaycaster = new THREE.Raycaster();
+vrControllerRaycaster.near = 0.01;
+vrControllerRaycaster.far = 50;
+
+const vrControllers = [];
+const vrControllerOrigin = new THREE.Vector3();
+const vrControllerDirection = new THREE.Vector3();
+
+function getVRControllerHoverTarget(controller) {
+  if (!renderer.xr.isPresenting || gazeNavigating) return null;
+
+  controller.updateMatrixWorld(true);
+  controller.getWorldPosition(vrControllerOrigin);
+  vrControllerDirection
+    .set(0, 0, -1)
+    .transformDirection(controller.matrixWorld);
+
+  const xrCamera = renderer.xr.getCamera(camera);
+  xrCamera.updateMatrixWorld(true);
+  vrControllerRaycaster.camera = xrCamera;
+  vrControllerRaycaster.set(vrControllerOrigin, vrControllerDirection);
+
+  if (vrHotspotPanel.visible) {
+    vrHotspotPanel.updateMatrixWorld(true);
+    const hit = vrControllerRaycaster
+      .intersectObjects(vrHotspotPanel.children, true)
+      .find(result =>
+        result.object.visible && result.object.userData.vrAction
+      );
+
+    return hit ? hit.object : null;
+  }
+
+  if (vrMenuGroup.visible) {
+    vrMenuGroup.updateMatrixWorld(true);
+    const hit = vrControllerRaycaster
+      .intersectObjects(vrMenuGroup.children, true)
+      .find(result => result.object.userData.action);
+
+    if (hit) return hit.object;
+    if (vrMenuOpen) return null;
+  }
+
+  if (vrBackToFarmsGroup.visible) {
+    vrBackToFarmsGroup.updateMatrixWorld(true);
+    const hit = vrControllerRaycaster
+      .intersectObjects(vrBackToFarmsGroup.children, true)
+      .find(result => result.object.userData.action);
+
+    if (hit) return hit.object;
+  }
+
+  hotspotGroup.updateMatrixWorld(true);
+  const hotspotHit = vrControllerRaycaster
+    .intersectObjects(hotspotGroup.children, true)
+    .find(result => result.object.userData.information);
+
+  if (hotspotHit) return hotspotHit.object;
+
+  arrowGroup.updateMatrixWorld(true);
+  const arrowHit = vrControllerRaycaster
+    .intersectObjects(arrowGroup.children, true)
+    .find(result => result.object.userData.target);
+
+  return arrowHit ? arrowHit.object : null;
+}
+
+function pulseVRController(controller) {
+  const gamepad = controller.userData.inputSource?.gamepad;
+  if (!gamepad) return;
+
+  const actuator = gamepad.hapticActuators?.[0];
+
+  try {
+    if (actuator && typeof actuator.pulse === 'function') {
+      actuator.pulse(0.3, 40)?.catch(error => {
+        console.warn('VR controller haptic feedback failed:', error);
+      });
+      return;
+    }
+
+    const vibrationActuator = gamepad.vibrationActuator;
+    if (vibrationActuator?.playEffect) {
+      vibrationActuator.playEffect('dual-rumble', {
+        duration: 40,
+        strongMagnitude: 0.3,
+        weakMagnitude: 0.3
+      }).catch(error => {
+        console.warn('VR controller haptic feedback failed:', error);
+      });
+    }
+  } catch (error) {
+    console.warn('VR controller haptic feedback failed:', error);
+  }
+}
+
+function updateVRControllerHaptics() {
+  vrControllers.forEach(controller => {
+    const target = getVRControllerHoverTarget(controller);
+
+    if (target && target !== controller.userData.hapticHoverTarget) {
+      pulseVRController(controller);
+    }
+
+    controller.userData.hapticHoverTarget = target;
+  });
+}
+
+function setupVRController(index) {
+  const controller = renderer.xr.getController(index);
+  controller.addEventListener('connected', event => {
+    controller.userData.inputSource = event.data;
+  });
+  controller.addEventListener('disconnected', () => {
+    controller.userData.inputSource = null;
+    controller.userData.hapticHoverTarget = null;
+  });
+
+  // Visible controller ray
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -20)
+  ]);
+
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false
+  });
+
+  const line = new THREE.Line(lineGeometry, lineMaterial);
+  line.renderOrder = 100;
+  line.frustumCulled = false;
+
+  controller.add(line);
+  controller.visible = false;
+
+  scene.add(controller);
+
+  controller.addEventListener('select', () => {
+    console.log(`Controller ${index} trigger detected`);
+
+    if (!renderer.xr.isPresenting || gazeNavigating) {
+      return;
+    }
+
+    controller.updateMatrixWorld(true);
+
+    // Get the controller's position and pointing direction.
+    const origin = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+
+    controller.getWorldPosition(origin);
+
+    direction
+      .set(0, 0, -1)
+      .transformDirection(controller.matrixWorld);
+
+    vrControllerRaycaster.camera = renderer.xr.getCamera(camera);
+    vrControllerRaycaster.set(origin, direction);
+
+    // PRIORITY 1: VR HOTSPOT INFORMATION PANEL
+    if (vrHotspotPanel.visible) {
+      vrHotspotPanel.updateMatrixWorld(true);
+
+      const panelHits =
+        vrControllerRaycaster.intersectObjects(
+          vrHotspotPanel.children,
+          true
+        );
+
+      const buttonHit = panelHits.find(
+        hit => hit.object.visible && hit.object.userData.vrAction
+      );
+
+      if (buttonHit) {
+        const action = buttonHit.object.userData.vrAction;
+
+        console.log('VR panel action:', action);
+        activateVRPanelAction(action);
+      }
+
+      return;
+    }
+
+    // PRIORITY 2: VR FARM MENU
+    if (vrMenuGroup.visible) {
+      vrMenuGroup.updateMatrixWorld(true);
+
+      const menuHits =
+        vrControllerRaycaster.intersectObjects(
+          vrMenuGroup.children,
+          true
+        );
+
+      const menuHit = menuHits.find(
+        hit => hit.object.userData.action
+      );
+
+      if (menuHit) {
+        console.log(
+          'VR menu action:',
+          menuHit.object.userData.action
+        );
+
+        handleVRMenuSelection(menuHit.object);
+        return;
+      }
+
+      // Block other selections only while the actual
+      // farm selection menu is open.
+      if (vrMenuOpen) {
+        return;
+      }
+
+      // If the small SELECT FARM button is visible
+      // but not being pointed at, continue checking.
+    }
+
+    if (vrBackToFarmsGroup.visible) {
+      vrBackToFarmsGroup.updateMatrixWorld(true);
+
+      const backHits = vrControllerRaycaster.intersectObjects(
+        vrBackToFarmsGroup.children,
+        true
+      );
+
+      const backHit = backHits.find(
+        hit => hit.object.userData.action
+      );
+
+      if (backHit) {
+        handleVRMenuSelection(backHit.object);
+        return;
+      }
+    }
+
+    // PRIORITY 3: HOTSPOTS
+    hotspotGroup.updateMatrixWorld(true);
+
+    const hotspotHits =
+      vrControllerRaycaster.intersectObjects(
+        hotspotGroup.children,
+        true
+      );
+
+    const hotspotHit = hotspotHits.find(
+      hit => hit.object.userData.information
+    );
+
+    if (hotspotHit) {
+      console.log(
+        'VR hotspot selected:',
+        hotspotHit.object.userData.information.title
+      );
+
+      openVRHotspot(hotspotHit.object);
+      return;
+    }
+
+    // PRIORITY 4: NAVIGATION ARROWS
+    arrowGroup.updateMatrixWorld(true);
+
+    const arrowHits =
+      vrControllerRaycaster.intersectObjects(
+        arrowGroup.children,
+        true
+      );
+
+    const arrowHit = arrowHits.find(
+      hit => hit.object.userData.target
+    );
+
+    if (arrowHit) {
+      const target = arrowHit.object.userData.target;
+
+      console.log('VR navigation target:', target);
+
+      gazeNavigating = true;
+      gazeTarget = null;
+      gazeStartTime = 0;
+
+      loadScene(target).finally(() => {
+        gazeNavigating = false;
+        gazeTarget = null;
+        gazeStartTime = 0;
+      });
+
+      return;
+    }
+
+    console.log('Controller ray did not hit an interactive object.');
+  });
+
+  vrControllers.push(controller);
+}
+
+// Set up both controllers.
+setupVRController(0);
+setupVRController(1);
+
+// Show controllers when entering VR.
+renderer.xr.addEventListener('sessionstart', () => {
+  console.log('Showing VR controllers');
+
+  vrControllers.forEach(controller => {
+    controller.visible = true;
+  });
+});
+
+// Hide controllers and close the hotspot panel when leaving VR.
+renderer.xr.addEventListener('sessionend', () => {
+  console.log('Hiding VR controllers');
+
+  vrControllers.forEach(controller => {
+    controller.visible = false;
+  });
+
+  closeVRHotspot();
+});
+
+
+loadScene('fatimaFarm1');
+loadScene('cowFarmEntrance');
+loadScene('ibericaFarm1');
 
 const farmMenu = document.createElement('section');
 farmMenu.id = 'farm-selection-screen';
@@ -1606,8 +3729,6 @@ farmMenu.querySelectorAll('.farm-card-button')
 
       loadScene(selectedFarm.scene);
 
-      preloadFarmImages(selectedFarm, selectedFarm.scene);
-
       farmMenu.classList.add('is-hidden');
       openFarmMenuButton.style.display = 'block';
 
@@ -1643,3 +3764,42 @@ if (TESTING_MODE) {
 
   loadScene(TEST_SCENE);
 }
+
+// =====================================
+// VR MENU SESSION HANDLING
+// =====================================
+
+renderer.xr.addEventListener('sessionstart', () => {
+
+  // Hide the regular HTML menu inside VR.
+  farmMenu.classList.add('is-hidden');
+  openFarmMenuButton.style.display = 'none';
+
+  if (activeFarm) {
+    // The user already selected a farm.
+    createVRSelectFarmButton();
+  } else {
+    // No farm selected yet.
+    openVRFarmMenu();
+  }
+
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+
+  // Hide the 3D menu when leaving VR.
+  vrMenuGroup.visible = false;
+  vrBackToFarmsGroup.visible = false;
+  vrBackToFarmsNeedsPlacement = false;
+  vrMenuOpen = false;
+
+  // Restore the normal browser menu if no farm was selected.
+  if (!activeFarm) {
+    farmMenu.classList.remove('is-hidden');
+    openFarmMenuButton.style.display = 'none';
+  } else {
+    farmMenu.classList.add('is-hidden');
+    openFarmMenuButton.style.display = 'block';
+  }
+
+});

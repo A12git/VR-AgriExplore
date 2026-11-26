@@ -30,33 +30,111 @@
 
     <h2 id="hotspot-title">Hotspot Title</h2>
 
-    <div class="hotspot-gallery">
+    <div class="hotspot-view-tabs" role="tablist" aria-label="Hotspot information">
+      <button
+        id="hotspot-area-tab"
+        class="hotspot-view-tab is-active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="hotspot-area-view"
+      >
+        Area info
+      </button>
+      <button
+        id="hotspot-showcase-tab"
+        class="hotspot-view-tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="hotspot-showcase-view"
+      >
+        Agricultural showcase
+      </button>
+    </div>
 
-      <div class="hotspot-image-container">
-        <img
-          id="hotspot-image"
-          src=""
-          alt="Hotspot image"
-        />
+    <div id="hotspot-area-view" role="tabpanel" aria-labelledby="hotspot-area-tab">
+      <div class="hotspot-gallery">
+
+        <div class="hotspot-image-container">
+          <img
+            id="hotspot-image"
+            src=""
+            alt="Hotspot image"
+          />
+        </div>
+
+        <div class="gallery-controls">
+          <button id="previous-image" class="gallery-button">
+            &#10094;
+          </button>
+
+          <span id="image-counter">1 / 1</span>
+
+          <button id="next-image" class="gallery-button">
+            &#10095;
+          </button>
+        </div>
       </div>
 
-      <div class="gallery-controls">
-        <button id="previous-image" class="gallery-button">
+      <div class="hotspot-description-section">
+        <h3>About this area</h3>
+        <p id="hotspot-description"></p>
+      </div>
+    </div>
+
+    <div
+      id="hotspot-showcase-view"
+      class="hotspot-showcase-view"
+      role="tabpanel"
+      aria-labelledby="hotspot-showcase-tab"
+      hidden
+    >
+      <div class="showcase-image-container">
+        <img id="showcase-image" alt="Featured farm product" hidden />
+        <p id="showcase-image-placeholder">Product image will appear here.</p>
+        <button
+          id="previous-showcase-image"
+          class="showcase-image-control showcase-image-previous"
+          type="button"
+          aria-label="Previous product image"
+          hidden
+        >
           &#10094;
         </button>
-
-        <span id="image-counter">1 / 1</span>
-
-        <button id="next-image" class="gallery-button">
+        <span id="showcase-image-counter" hidden></span>
+        <button
+          id="next-showcase-image"
+          class="showcase-image-control showcase-image-next"
+          type="button"
+          aria-label="Next product image"
+          hidden
+        >
           &#10095;
         </button>
       </div>
 
-    </div>
+      <div class="showcase-product-controls" id="showcase-product-controls" hidden>
+        <button id="previous-showcase-product" class="gallery-button">
+          &#10094;
+        </button>
+        <span id="showcase-product-counter"></span>
+        <button id="next-showcase-product" class="gallery-button">
+          &#10095;
+        </button>
+      </div>
 
-    <div class="hotspot-description-section">
-      <h3>About this area</h3>
-      <p id="hotspot-description"></p>
+      <h3 id="showcase-product-title">Featured farm products</h3>
+
+      <section class="showcase-information-section">
+        <h4>Description</h4>
+        <p id="showcase-product-description"></p>
+      </section>
+
+      <section class="showcase-information-section showcase-production-section">
+        <h4>How it is produced</h4>
+        <p id="showcase-product-production"></p>
+      </section>
     </div>
 
   </div>

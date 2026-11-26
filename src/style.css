@@ -411,6 +411,147 @@ canvas{
   color: #58685b;
 }
 
+#hotspot-info [hidden] {
+  display: none !important;
+}
+
+.hotspot-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dce5da;
+}
+
+.hotspot-view-tab {
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid #cbd9c9;
+  border-radius: 7px;
+  background: #edf2eb;
+  color: #34543b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.hotspot-view-tab.is-active,
+.hotspot-view-tab:hover {
+  border-color: #214b32;
+  background: #214b32;
+  color: #fff;
+}
+
+.showcase-image-container {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e7ede5;
+}
+
+.showcase-image-control {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 50%;
+  background: rgba(33, 75, 50, 0.9);
+  color: #fff;
+  cursor: pointer;
+}
+
+.showcase-image-control:hover {
+  background: #214b32;
+}
+
+.showcase-image-previous {
+  left: 10px;
+}
+
+.showcase-image-next {
+  right: 10px;
+}
+
+#showcase-image-counter {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  padding: 4px 9px;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+#showcase-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#showcase-image-placeholder {
+  margin: 0;
+  padding: 20px;
+  color: #667568;
+  font-size: 14px;
+  text-align: center;
+}
+
+.showcase-product-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  margin-top: 12px;
+}
+
+#showcase-product-counter {
+  color: #667568;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+#showcase-product-title {
+  margin: 18px 0 14px;
+  color: #214b32;
+  font-size: 21px;
+}
+
+.showcase-information-section {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 9px;
+  background: #edf2eb;
+}
+
+.showcase-information-section h4 {
+  margin: 0 0 8px;
+  color: #214b32;
+  font-size: 14px;
+}
+
+.showcase-information-section p {
+  margin: 0;
+  color: #58685b;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.showcase-production-section {
+  border: 1px solid #cbd9c9;
+}
+
 /* MOBILE */
 
 @media (max-width: 560px) {
@@ -430,5 +571,9 @@ canvas{
 
   .hotspot-image-container {
     height: 190px;
+  }
+
+  .showcase-image-container {
+    height: 160px;
   }
 }
