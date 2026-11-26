@@ -64,16 +64,134 @@ const ring = new THREE.Mesh(
 gazeReticle.add(dot);
 gazeReticle.add(ring);
 
+// Tooltip canvas
+const tooltipCanvas = document.createElement('canvas');
+tooltipCanvas.width = 512;
+tooltipCanvas.height = 96;
+
+const tooltipContext = tooltipCanvas.getContext('2d');
+
+const tooltipTexture = new THREE.CanvasTexture(tooltipCanvas);
+
+const tooltipSprite = new THREE.Sprite(
+  new THREE.SpriteMaterial({
+    map: tooltipTexture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false
+  })
+);
+
+// Position the tooltip below the reticle
+tooltipSprite.scale.set(0.42, 0.079, 1);
+tooltipSprite.position.set(0, -0.10, 0.01);
+
+gazeReticle.add(tooltipSprite);
+tooltipSprite.visible = false;
+
+// Update tooltip text
+let lastTooltipMessage = '';
+
+function setGazeTooltip(message) {
+  if (message === lastTooltipMessage) return;
+
+  lastTooltipMessage = message;
+
+  tooltipContext.clearRect(
+    0, 0,
+    tooltipCanvas.width,
+    tooltipCanvas.height
+  );
+
+  tooltipContext.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  tooltipContext.beginPath();
+  tooltipContext.roundRect(4, 4, 504, 88, 20);
+  tooltipContext.fill();
+
+  tooltipContext.fillStyle = 'white';
+  tooltipContext.font = 'bold 28px Arial';
+  tooltipContext.textAlign = 'center';
+  tooltipContext.textBaseline = 'middle';
+
+  tooltipContext.fillText(
+    message,
+    256,
+    48
+  );
+
+  tooltipTexture.needsUpdate = true;
+}
+
 gazeReticle.position.set(0, 0, -1);
 
 camera.add(gazeReticle);
+scene.add(camera);
 
 gazeReticle.visible = false;
+
+scene.add(camera);
+
+// Gaze information HUD
+const gazeCanvas = document.createElement('canvas');
+gazeCanvas.width = 512;
+gazeCanvas.height = 128;
+
+const gazeContext = gazeCanvas.getContext('2d');
+const gazeTexture = new THREE.CanvasTexture(gazeCanvas);
+
+const gazeHud = new THREE.Sprite(
+  new THREE.SpriteMaterial({
+    map: gazeTexture,
+    transparent: true,
+    depthTest: false
+  })
+);
+
+gazeHud.scale.set(0.65, 0.16, 1);
+gazeHud.position.set(0, -0.12, -1);
+gazeHud.visible = false;
+
+camera.add(gazeHud);
+
+const gazeRaycaster = new THREE.Raycaster();
+const gazeOrigin = new THREE.Vector3();
+const gazeDirection = new THREE.Vector3();
+
+const GAZE_DURATION = 4000;
+
+let gazeTarget = null;
+let gazeStartTime = 0;
+let gazeNavigating = false;
+
+function updateGazeHUD(sceneName, countdown) {
+  gazeContext.clearRect(0, 0, 512, 128);
+
+  gazeContext.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  gazeContext.beginPath();
+  gazeContext.roundRect(20, 10, 472, 108, 20);
+  gazeContext.fill();
+
+  gazeContext.fillStyle = 'white';
+  gazeContext.font = 'bold 30px Arial';
+  gazeContext.textAlign = 'center';
+  gazeContext.fillText(sceneName, 256, 53);
+
+  gazeContext.font = '26px Arial';
+  gazeContext.fillText(
+    countdown ? `Navigating in ${countdown}...` : '',
+    256,
+    90
+  );
+
+  gazeTexture.needsUpdate = true;
+}
+
 
 function updateGazeNavigation() {
 
   if (!renderer.xr.isPresenting) {
     gazeReticle.visible = false;
+    gazeHud.visible = false;
 
     gazeTarget = null;
     gazeStartTime = 0;
@@ -101,9 +219,12 @@ function updateGazeNavigation() {
     intersection => intersection.object.userData.target
   );
 
+  // Hide the scene name and countdown when not looking at a marker.
   if (!hit) {
     gazeTarget = null;
     gazeStartTime = 0;
+
+    gazeHud.visible = false;
 
     ring.material.color.set(0xffffff);
     ring.scale.setScalar(1);
@@ -113,6 +234,7 @@ function updateGazeNavigation() {
 
   const target = hit.object.userData.target;
 
+  // Start countdown when looking at a new marker.
   if (gazeTarget !== target) {
     gazeTarget = target;
     gazeStartTime = performance.now();
@@ -125,15 +247,32 @@ function updateGazeNavigation() {
     1
   );
 
+  const remaining = Math.max(
+    1,
+    Math.ceil((GAZE_DURATION - elapsedTime) / 1000)
+  );
+
+  // Get the destination's display name.
+  const targetLocation = activeFarm?.locations.find(
+    loc => loc.scene === target
+  );
+
+  const sceneName = targetLocation?.name || target;
+
+  // Display the scene name and countdown.
+  gazeHud.visible = true;
+  updateGazeHUD(sceneName, remaining);
+
+  // Grow the reticle ring as the countdown progresses.
   ring.scale.setScalar(1 + progress * 0.4);
 
+  // Navigate after 4 seconds.
   if (progress >= 1) {
 
     gazeNavigating = true;
+    gazeHud.visible = false;
 
-    const nextScene = target;
-
-    loadScene(nextScene).finally(() => {
+    loadScene(target).finally(() => {
 
       gazeNavigating = false;
       gazeTarget = null;
@@ -146,12 +285,35 @@ function updateGazeNavigation() {
   }
 }
 
+
 const renderer = new THREE.WebGLRenderer({
   antialias: true
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
+
+renderer.xr.addEventListener('sessionstart', () => {
+  console.log('VR mode started');
+
+  gazeReticle.visible = true;
+  tooltipSprite.visible = false;
+
+  gazeTarget = null;
+  gazeStartTime = 0;
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+  console.log('VR mode ended');
+
+  gazeReticle.visible = false;
+  tooltipSprite.visible = false;
+
+  gazeTarget = null;
+  gazeStartTime = 0;
+
+  ring.scale.setScalar(1);
+});
 
 document.body.appendChild(renderer.domElement);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -166,6 +328,8 @@ const loader = new THREE.TextureLoader();
 
 const textureCache = new Map();
 const texturePromises = new Map();
+
+
 
 function getPanoramaTexture(path) {
   
