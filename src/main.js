@@ -1006,6 +1006,9 @@ const nextShowcaseImage = document.getElementById(
 const showcaseImageCounter = document.getElementById(
   'showcase-image-counter'
 );
+const showcaseProductSelector = document.getElementById(
+  'showcase-product-selector'
+);
 const showcaseProductControls = document.getElementById(
   'showcase-product-controls'
 );
@@ -1043,6 +1046,40 @@ function getShowcaseProductImages(product) {
   return product?.image ? [product.image] : [];
 }
 
+function renderDesktopShowcaseProductSelector() {
+  showcaseProductSelector.replaceChildren();
+  showcaseProductSelector.hidden = currentShowcaseProducts.length <= 1;
+
+  currentShowcaseProducts.forEach((product, index) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'showcase-product-option';
+    option.setAttribute(
+      'aria-label',
+      `Show ${product.title || `featured product ${index + 1}`}`
+    );
+
+    const imagePath = product.thumbnail || getShowcaseProductImages(product)[0];
+    if (imagePath) {
+      const image = document.createElement('img');
+      image.src = imagePath;
+      image.alt = '';
+      option.append(image);
+    }
+
+    const label = document.createElement('span');
+    label.textContent = product.title || `Product ${index + 1}`;
+    option.append(label);
+    option.addEventListener('click', () => {
+      currentShowcaseProductIndex = index;
+      currentShowcaseImageIndex = 0;
+      showDesktopShowcaseProduct();
+    });
+
+    showcaseProductSelector.append(option);
+  });
+}
+
 function setDesktopHotspotView(view) {
   const isShowcase = view === 'showcase';
 
@@ -1065,6 +1102,16 @@ function showDesktopShowcaseProduct() {
 
   showcaseProductControls.hidden =
     currentShowcaseProducts.length <= 1;
+  Array.from(showcaseProductSelector.children).forEach((option, index) => {
+    option.classList.toggle(
+      'is-selected',
+      index === currentShowcaseProductIndex
+    );
+    option.setAttribute(
+      'aria-pressed',
+      String(index === currentShowcaseProductIndex)
+    );
+  });
   previousShowcaseImage.hidden = images.length <= 1;
   nextShowcaseImage.hidden = images.length <= 1;
   showcaseImageCounter.hidden = images.length <= 1;
@@ -1325,6 +1372,7 @@ function openHotspotInformation(information) {
     : [];
   currentShowcaseProductIndex = 0;
   currentShowcaseImageIndex = 0;
+  renderDesktopShowcaseProductSelector();
   setDesktopHotspotView('area');
 
   currentImages = information.images || [];
@@ -2547,12 +2595,21 @@ const farmHotspots = {
     size: 0.5,
     thumbnail: `${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`,
     images: [`${import.meta.env.BASE_URL}iberica/NEAR CANOPY.jpg`],
-    // Add products with title, images array, description, and production details.
-    showcase: [{title: 'This is an eggplant plant.',
-              images:[`${import.meta.env.BASE_URL}product/iberica/Eggplant.jpg`],
-              description:'This is one of the produce that this farm helps test and give to other farmers.',
-              production:'Eggplants grow well in a location that gets full sun—at least 6 to 8 hours of direct sunlight per day.\n Eggplants grow best in a well-draining sandy loam or loam soil that is fairly high in organic matter.'
-    }]
+    showcase: [
+      {
+        title: 'Eggplant',
+        images: [`${import.meta.env.BASE_URL}product/iberica/Eggplant.jpg`],
+        description: 'This is one of the crops that the farm helps test and share with other farmers.',
+        production: 'Eggplants grow well in a location that gets full sun—at least 6 to 8 hours of direct sunlight per day. They grow best in well-draining soil that is rich in organic matter.'
+      },
+      {
+        title: 'Papaya',
+        thumbnail: `${import.meta.env.BASE_URL}product/iberica/Papaya.webp`,
+        images: [`${import.meta.env.BASE_URL}product/iberica/Papaya.webp`],
+        description: 'Papaya trees grow between the canopy structures at the farm.',
+        production: 'Papaya grows best in a warm, sunny location with well-draining soil. Keep the soil evenly moist and protect young plants from strong winds.'
+      }
+    ]
   }]
 };
 
@@ -2588,6 +2645,7 @@ const vrPanelMesh = new THREE.Mesh(
 
 vrPanelMesh.renderOrder = 50;
 vrHotspotPanel.add(vrPanelMesh);
+vrHotspotPanel.scale.setScalar(1.1);
 
 let vrPanelInformation = null;
 let vrPanelImages = [];
@@ -2810,8 +2868,24 @@ function drawVRHotspotPanel() {
         showcaseProduct.title || 'Featured product',
         55,
         415,
-        900
+        hasShowcaseNavigation ? 760 : 900
       );
+
+      if (hasShowcaseNavigation) {
+        ctx.fillStyle = '#263b30';
+        ctx.beginPath();
+        ctx.roundRect(850, 387, 119, 38, 12);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          `${vrShowcaseProductIndex + 1} / ${vrShowcaseProducts.length}`,
+          909,
+          412
+        );
+        ctx.textAlign = 'left';
+      }
 
       ctx.fillStyle = '#a9d5a7';
       ctx.font = 'bold 20px Arial';
@@ -2917,13 +2991,6 @@ function drawVRHotspotPanel() {
       ctx.font = 'bold 25px Arial';
       ctx.fillText('PREVIOUS', 105, 670);
       ctx.fillText('NEXT', 800, 670);
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        `${vrShowcaseProductIndex + 1} / ${vrShowcaseProducts.length}`,
-        512,
-        620
-      );
-      ctx.textAlign = 'left';
     }
 
     vrPanelTexture.needsUpdate = true;
